@@ -4,8 +4,8 @@ import (
 	"os"
 	"fmt"
 	"net"
-	"strconv"
 	"io"
+	"strconv"
 )
 
 func ifErrorExit(err error) {
@@ -18,29 +18,32 @@ func ifErrorExit(err error) {
 func relay(conn net.Conn) {
 	defer conn.Close()
 
-	stinDone := make(chan bool)
-	remoteDone := make(chan bool)
+	done := make(chan int, 2)
+
+	active := 1
+	passive := 2
 
 	// [stdin] -> remote
 	go func() {
 		io.Copy(conn, os.Stdin)
-		stinDone <- true
+		done <- active
 	}()
 
 	// stdout <- [remote]
 	go func() {
 		io.Copy(os.Stdout, conn)
-		remoteDone <- true
+		done <- passive
 	}()
 
-	for i := 0; i < 2; i++ {
-		select {
-		case <-stinDone:
-			conn.(*net.TCPConn).CloseWrite()
-			fmt.Println("[stdin] -> remote shutdown")
-		case <-remoteDone:
-			fmt.Println("stdout <- [remote] shutdown")
-		}
+	first := <-done
+
+	if first == active {
+		conn.(*net.TCPConn).CloseWrite()
+		<-done
+	} else {
+		// how to stop read from stdin?
+		<-done
+		conn.(*net.TCPConn).CloseWrite()
 	}
 }
 
