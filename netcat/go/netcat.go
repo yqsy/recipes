@@ -41,9 +41,9 @@ func relay(conn net.Conn) {
 		conn.(*net.TCPConn).CloseWrite()
 		<-done
 	} else {
-		// how to stop read from stdin?
-		<-done
-		conn.(*net.TCPConn).CloseWrite()
+		//how to stop read from stdin?
+		//<-done
+		//conn.(*net.TCPConn).CloseWrite()
 	}
 }
 
