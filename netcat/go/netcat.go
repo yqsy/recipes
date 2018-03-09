@@ -20,20 +20,20 @@ func relay(conn net.Conn) {
 
 	done := make(chan int, 2)
 
-	active := 1
-	passive := 2
+	const active = 1
+	const passive = 2
 
 	// [stdin] -> remote
-	go func() {
+	go func(conn net.Conn, done chan int) {
 		io.Copy(conn, os.Stdin)
 		done <- active
-	}()
+	}(conn, done)
 
 	// stdout <- [remote]
-	go func() {
+	go func(conn net.Conn, done chan int) {
 		io.Copy(os.Stdout, conn)
 		done <- passive
-	}()
+	}(conn, done)
 
 	first := <-done
 
@@ -60,6 +60,7 @@ func main() {
 	ifErrorExit(err)
 
 	if arg[1] == "-l" {
+		//server
 		addr := ":" + strconv.Itoa(port)
 		listener, err := net.Listen("tcp", addr)
 		ifErrorExit(err)
@@ -68,6 +69,7 @@ func main() {
 		listener.Close()
 		relay(conn)
 	} else {
+		//client
 		addr := arg[1] + ":" + strconv.Itoa(port)
 		conn, err := net.Dial("tcp", addr)
 		ifErrorExit(err)
