@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"io"
-	"strconv"
 )
 
 func ifErrorExit(err error) {
@@ -56,12 +55,9 @@ func main() {
 		return
 	}
 
-	port, err := strconv.Atoi(arg[2])
-	ifErrorExit(err)
-
 	if arg[1] == "-l" {
 		//server
-		addr := ":" + strconv.Itoa(port)
+		addr := ":" + arg[2]
 		listener, err := net.Listen("tcp", addr)
 		ifErrorExit(err)
 		conn, err := listener.Accept()
@@ -70,7 +66,7 @@ func main() {
 		relay(conn)
 	} else {
 		//client
-		addr := arg[1] + ":" + strconv.Itoa(port)
+		addr := arg[1] + ":" + arg[2]
 		conn, err := net.Dial("tcp", addr)
 		ifErrorExit(err)
 		relay(conn)
