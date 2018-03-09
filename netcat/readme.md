@@ -1,26 +1,18 @@
 <!-- TOC -->
 
-- [1. 如何写出正确的netcat?](#1-如何写出正确的netcat)
+- [1. netcat](#1-netcat)
 - [2. 测试吞吐量](#2-测试吞吐量)
 
 <!-- /TOC -->
 
 
 
-<a id="markdown-1-如何写出正确的netcat" name="1-如何写出正确的netcat"></a>
-# 1. 如何写出正确的netcat?
+<a id="markdown-1-netcat" name="1-netcat"></a>
+# 1. netcat
 
 netcat要做到的事情
 * [stdin] -> remote
 * stdout <- [remote]
-
-3.5个事件
-* 连接建立
-* 连接关闭
-* 收到数据
-* 数据成功拷贝到缓冲区
-
-在本个应用中,因为tcp有半关闭的特性,所以有难度的是`连接关闭`的事件
 
 正确关闭的方式应该是两种情况:
 
@@ -35,13 +27,11 @@ stdout <-shutdown `[remote]`
 `[stdin]` ->shutdown remote  
 close socket  
 
+情况二的问题是,要`等到`用户按下`ctrl+d`才能够完整的进行完`半关闭`
 
-程序应该被设计成`两个并发单元`,并发单元结束后`按照关闭的两种情况去shutdown write`
+但是对于工具的使用者来说,我想达到`对方shutdown wr或者close了连接`,我方`看看是否还有要发送的消息`,如果没有,就`shutdown wr且close`.
 
-注意 情况二被动接收到shutdown write时,没有好的办法`从stdin中唤醒`,所以`直接close`.
-
-由上所述,程序只能说是`支持主动半关闭`,`不能支持被动半关闭`
-
+但是没有好的方法可以做到`看看是否还有要发送的消息`,所以我直接os.close了
 
 <a id="markdown-2-测试吞吐量" name="2-测试吞吐量"></a>
 # 2. 测试吞吐量
