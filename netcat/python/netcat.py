@@ -29,7 +29,7 @@ def copy(dst, src):
 
 
 def relay(conn):
-    with closing(conn) as c:
+    with closing(conn):
         done_queue = Queue()
 
         active = 1
