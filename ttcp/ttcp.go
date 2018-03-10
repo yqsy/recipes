@@ -54,6 +54,7 @@ func (sessionMessage SessionMessage) checkLegalAndExit() {
 func receive(listenAddr string) {
 	listener, err := net.Listen("tcp", listenAddr)
 	ifErrorExit(err)
+	fmt.Printf("Listening on %v\n", listenAddr)
 	defer listener.Close()
 	conn, err := listener.Accept()
 	ifErrorExit(err)
