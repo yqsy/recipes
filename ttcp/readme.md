@@ -26,7 +26,7 @@ field 1: ack 4 bytes
 
 ```bash
 # 默认监听5003
-go run ttcp.go server
+go run ttcp.go server -p 5003
 
 # 自定义payload大小(默认65535)
 go run ttcp.go client -l 1048576
