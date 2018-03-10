@@ -26,4 +26,7 @@ close
 go run netcat-half.go -l 20000
 go run tcprelay.go 0.0.0.0 10000 localhost 20000
 go run netcat-half.go localhost 10000
+
+# 或
+python3 tcprelay.py 0.0.0.0 10000 localhost 20000
 ```
