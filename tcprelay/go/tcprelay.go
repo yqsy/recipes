@@ -15,13 +15,6 @@ func ifErrorExit(err error) {
 	}
 }
 
-func copy(dst net.Conn, src net.Conn, done chan bool) {
-	io.Copy(dst, src)
-	dst.(*net.TCPConn).CloseWrite()
-	log.Printf("done: %v -> %v\n", src.RemoteAddr(), dst.RemoteAddr())
-	<-done
-}
-
 func relay(localConn net.Conn, remoteAddr string) {
 	defer localConn.Close()
 
