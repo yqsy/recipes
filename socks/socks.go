@@ -103,7 +103,8 @@ func socksHandle(localConn net.Conn) {
 		return
 	}
 
-	userNameBytes, err := bufio.NewReader(localConn).ReadBytes(0)
+	bufReader := bufio.NewReader(localConn)
+	userNameBytes, err := bufReader.ReadBytes(0)
 	if err != nil {
 		return
 	}
@@ -114,11 +115,11 @@ func socksHandle(localConn net.Conn) {
 
 	if socks4Req.isSocks4a() {
 		// read until NULL
-		domainBytes, err := bufio.NewReader(localConn).ReadBytes(0)
+		domainBytes, err := bufReader.ReadBytes(0)
 		if err != nil {
 			return
 		}
-		remoteAddr = string(domainBytes[:1]) + ":" + socks4Req.getPort()
+		remoteAddr = string(domainBytes[:len(domainBytes)-1]) + ":" + socks4Req.getPort()
 	} else {
 		remoteAddr = socks4Req.getIP() + ":" + socks4Req.getPort()
 	}
