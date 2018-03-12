@@ -7,10 +7,9 @@ import (
 	"io"
 )
 
-func ifErrorExit(err error) {
+func panicOnError(err error) {
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
+		panic(err)
 	}
 }
 
@@ -58,16 +57,16 @@ func main() {
 		//server
 		addr := ":" + arg[2]
 		listener, err := net.Listen("tcp", addr)
-		ifErrorExit(err)
+		panicOnError(err)
 		conn, err := listener.Accept()
-		ifErrorExit(err)
+		panicOnError(err)
 		listener.Close()
 		relay(conn)
 	} else {
 		//client
 		addr := arg[1] + ":" + arg[2]
 		conn, err := net.Dial("tcp", addr)
-		ifErrorExit(err)
+		panicOnError(err)
 		relay(conn)
 	}
 }

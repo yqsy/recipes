@@ -8,10 +8,9 @@ import (
 	"io"
 )
 
-func ifErrorExit(err error) {
+func panicOnError(err error) {
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
+		panic(err)
 	}
 }
 
@@ -61,7 +60,7 @@ func main() {
 	listenAddr := arg[1] + ":" + arg[2]
 
 	listener, err := net.Listen("tcp", listenAddr)
-	ifErrorExit(err)
+	panicOnError(err)
 
 	remoteAddr := arg[3] + ":" + arg[4]
 

@@ -3,17 +3,15 @@ package main
 import (
 	"net"
 	"fmt"
-	"os"
 	"encoding/binary"
 	"bufio"
 	"log"
 	"io"
 )
 
-func ifErrorExit(err error) {
+func panicOnError(err error) {
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
+		panic(err)
 	}
 }
 
@@ -149,7 +147,7 @@ func socksHandle(localConn net.Conn) {
 
 func main() {
 	listener, err := net.Listen("tcp", ":20001")
-	ifErrorExit(err)
+	panicOnError(err)
 
 	defer listener.Close()
 
