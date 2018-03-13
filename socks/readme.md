@@ -45,15 +45,18 @@ nc --proxy-type socks4 --proxy 127.0.0.1:1080 127.0.0.1 5003
 <a id="markdown-3-单元测试" name="3-单元测试"></a>
 # 3. 单元测试
 
+正确:
 * socks4 正确性测试
 * socks4a 正确性测试
+* 包体一个一个字节发
+* local half close
+* remote half close
+* 只开连接不发包,踢掉空闲连接的逻辑的正确性验证
+
+错误:
 * 第一个字节不为4
 * 第二个字节不为1
-* 包头8字节一个一个字节发
 * user ID string 长度攻击
-* user ID 一个一个字节发 (验证复杂度和正确性)
 * socks4a domain长度攻击
-* socks4a domain 一个一个字节发 (验证复杂度和正确性)
-* 只开连接不发包攻击,用户层心跳包验证正确性
-* remote half close
-* local half close
+
+

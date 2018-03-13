@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"log"
 	"io"
+	"os"
 )
 
 func panicOnError(err error) {
@@ -44,13 +45,13 @@ func (socks4Req Socks4Req) isSocks4a() bool {
 func (socks4Req Socks4Req) checkLegal(remoteAddr net.Addr) bool {
 	// must be 0x04 for this version
 	if socks4Req.Version != 0x04 {
-		log.Printf("illegal Version: %v from: %v", socks4Req.Version, remoteAddr)
+		log.Printf("illegal Version: %v from: %v\n", socks4Req.Version, remoteAddr)
 		return false
 	}
 
 	// 0x01 = establish a TCP/IP stream connection
 	if socks4Req.CommandCode != 1 {
-		log.Printf("illegal CommandCode: %v: from: %v", socks4Req.CommandCode, remoteAddr)
+		log.Printf("illegal CommandCode: %v: from: %v\n", socks4Req.CommandCode, remoteAddr)
 		return false
 	}
 	return true
@@ -64,7 +65,7 @@ type Socks4Res struct {
 }
 
 func relayTcpUntilDie(localConn net.Conn, remoteAddr string, remoteConn net.Conn) {
-	log.Printf("relay: %v <-> %v", localConn.RemoteAddr(), remoteAddr)
+	log.Printf("relay: %v <-> %v\n", localConn.RemoteAddr(), remoteAddr)
 	done := make(chan bool, 2)
 
 	go func(remoteConn net.Conn, localConn net.Conn, remoteAddr string, done chan bool) {
@@ -102,7 +103,8 @@ func socksHandle(localConn net.Conn) {
 	}
 
 	bufReader := bufio.NewReader(localConn)
-	userNameBytes, err := bufReader.ReadBytes(0)
+	userNameBytes, err := bufReader.ReadSlice(0)
+
 	if err != nil {
 		return
 	}
@@ -112,8 +114,7 @@ func socksHandle(localConn net.Conn) {
 	var remoteAddr string
 
 	if socks4Req.isSocks4a() {
-		// read until NULL
-		domainBytes, err := bufReader.ReadBytes(0)
+		domainBytes, err := bufReader.ReadSlice(0)
 		if err != nil {
 			return
 		}
@@ -146,7 +147,13 @@ func socksHandle(localConn net.Conn) {
 }
 
 func main() {
-	listener, err := net.Listen("tcp", ":20001")
+	arg := os.Args
+	if len(arg) < 2 {
+		fmt.Printf("Usage:\n %v listenaddr\nExample:\n %v :1080\n", arg[0], arg[0])
+		return
+	}
+
+	listener, err := net.Listen("tcp", arg[1])
 	panicOnError(err)
 
 	defer listener.Close()
