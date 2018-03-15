@@ -41,5 +41,6 @@ func main() {
 
 	<-locked
 	spinLock.Lock()
+	defer spinLock.Unlock()
 	fmt.Println("done")
 }
