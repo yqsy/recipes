@@ -20,18 +20,18 @@ type SessionMessage struct {
 	Number, Length int32
 }
 
-func (sessionMessage SessionMessage) print() {
+func (sessionMessage *SessionMessage) print() {
 	fmt.Printf("number of buffers = %d\nbuffer length = %d\n",
 		sessionMessage.Number, sessionMessage.Length)
 	fmt.Printf("%.3f Mib in total\n", sessionMessage.getTotalMb())
 }
 
-func (sessionMessage SessionMessage) getTotalMb() float64 {
+func (sessionMessage *SessionMessage) getTotalMb() float64 {
 	totalMb := float64(sessionMessage.Number) * float64(sessionMessage.Length) / 1024.0 / 1024.0
 	return totalMb
 }
 
-func (sessionMessage SessionMessage) checkLegal() bool {
+func (sessionMessage *SessionMessage) checkLegal() bool {
 	if sessionMessage.Length < 0 {
 		return false
 	} else if sessionMessage.Length > 100*1024*1024 { // 100 MB
@@ -43,7 +43,7 @@ func (sessionMessage SessionMessage) checkLegal() bool {
 	return true
 }
 
-func (sessionMessage SessionMessage) checkLegalAndExit() {
+func (sessionMessage *SessionMessage) checkLegalAndExit() {
 	if !sessionMessage.checkLegal() {
 		fmt.Println("unlegal SessionMessage")
 		os.Exit(-1)

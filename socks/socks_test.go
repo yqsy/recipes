@@ -241,7 +241,7 @@ func TestHeadSecondBytes(t *testing.T) {
 	defer conn.Close()
 
 	socks4Req := Socks4Req{0x04,
-		0x05, // !
+		255, // !
 		30000,
 		[4]byte{127, 0, 0, 1}}
 

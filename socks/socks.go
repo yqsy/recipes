@@ -23,7 +23,7 @@ type Socks4Req struct {
 	Ipv4Addr    [4]byte
 }
 
-func (socks4Req Socks4Req) getIP() string {
+func (socks4Req *Socks4Req) getIP() string {
 	return fmt.Sprintf("%v.%v.%v.%v",
 		socks4Req.Ipv4Addr[0],
 		socks4Req.Ipv4Addr[1],
@@ -31,18 +31,18 @@ func (socks4Req Socks4Req) getIP() string {
 		socks4Req.Ipv4Addr[3])
 }
 
-func (socks4Req Socks4Req) getPort() string {
+func (socks4Req *Socks4Req) getPort() string {
 	return fmt.Sprintf("%v", socks4Req.Port)
 }
 
-func (socks4Req Socks4Req) isSocks4a() bool {
+func (socks4Req *Socks4Req) isSocks4a() bool {
 	return socks4Req.Ipv4Addr[0] == 0 &&
 		socks4Req.Ipv4Addr[1] == 0 &&
 		socks4Req.Ipv4Addr[2] == 0 &&
 		socks4Req.Ipv4Addr[3] != 0
 }
 
-func (socks4Req Socks4Req) checkLegal(remoteAddr net.Addr) bool {
+func (socks4Req *Socks4Req) checkLegal(remoteAddr net.Addr) bool {
 	// must be 0x04 for this version
 	if socks4Req.Version != 0x04 {
 		log.Printf("illegal Version: %v from: %v\n", socks4Req.Version, remoteAddr)

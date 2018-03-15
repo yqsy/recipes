@@ -51,12 +51,10 @@ nc --proxy-type socks4 --proxy 127.0.0.1:1080 127.0.0.1 5003
 * 包体一个一个字节发
 * local half close
 * remote half close
-* 只开连接不发包,踢掉空闲连接的逻辑的正确性验证
+
 
 错误:
 * 第一个字节不为4
 * 第二个字节不为1
 * user ID string 长度攻击
 * socks4a domain长度攻击
-
-
