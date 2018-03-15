@@ -34,9 +34,9 @@ func main() {
 
 	go func(spinLock SpinLock, locked chan bool) {
 		spinLock.Lock()
+		defer spinLock.Unlock()
 		locked <- true
 		time.Sleep(time.Second * 5)
-		spinLock.Unlock()
 	}(spinLock, locked)
 
 	<-locked
