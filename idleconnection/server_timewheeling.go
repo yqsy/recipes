@@ -4,34 +4,37 @@ import (
 	"net"
 	"container/ring"
 	"time"
+	"log"
+	"os"
 	"fmt"
+	"io"
 )
 
 //  map[ele]struct{} like c++'s unordered_set
 type Bucket struct {
-	tasks map[interface{}]struct{}
+	eles map[interface{}]struct{}
 }
 
 func newBucket() *Bucket {
 	bucket := Bucket{}
-	bucket.tasks = make(map[interface{}]struct{})
+	bucket.eles = make(map[interface{}]struct{})
 	return &bucket
 }
 
-func (bucket *Bucket) deleteTask(task interface{}) {
-	delete(bucket.tasks, task)
+func (bucket *Bucket) deleteEle(ele interface{}) {
+	delete(bucket.eles, ele)
 }
 
-func (bucket *Bucket) addTask(task interface{}) {
-	bucket.tasks[bucket] = struct{}{}
+func (bucket *Bucket) addEle(ele interface{}) {
+	bucket.eles[ele] = struct{}{}
 }
 
 type TimeWheel struct {
 	// ring[bucket*,bucket*,bucket*,...]
 	slots *ring.Ring
 
-	// the bucket of the ring which specify task last added to
-	// map[task]bucket*
+	// the bucket of the ring which specify ele last added to
+	// map[ele]bucket*
 	lastBucket map[interface{}]*Bucket
 
 	durationPerTick time.Duration
@@ -42,7 +45,7 @@ type TimeWheel struct {
 	onTick func(interface{})
 
 	// when ticket print whole wheel
-	debugPrint bool
+	debugLog bool
 
 	firstSlot *ring.Ring
 }
@@ -59,7 +62,7 @@ func New(ticksPerWheel int, durationPerTick time.Duration, f func(interface{})) 
 		addChan:         make(chan interface{}),
 		delChan:         make(chan interface{}),
 		onTick:          f,
-		debugPrint:      false,
+		debugLog:        false,
 		firstSlot:       nil}
 
 	// init firstSlot for debug print
@@ -77,15 +80,23 @@ func New(ticksPerWheel int, durationPerTick time.Duration, f func(interface{})) 
 }
 
 // two feature
-// 1. add new task to TimeWheel
-// 2. increase task life in TimeWheel
-func (tw *TimeWheel) add(task interface{}) {
-	tw.addChan <- task
+// 1. add new ele to TimeWheel
+// 2. increase ele's life in TimeWheel
+func (tw *TimeWheel) add(ele interface{}) {
+	tw.addChan <- ele
 }
 
-// delete task life bind in TimeWheel
-func (tw *TimeWheel) del(task interface{}) {
-	tw.delChan <- task
+// delete ele life bind in TimeWheel
+func (tw *TimeWheel) del(ele interface{}) {
+	tw.delChan <- ele
+}
+
+func (tw *TimeWheel) lifeLongestBucket() *Bucket {
+	return tw.slots.Prev().Value.(*Bucket)
+}
+
+func (tw *TimeWheel) currentBucket() *Bucket {
+	return tw.slots.Value.(*Bucket)
 }
 
 // may be run in goroutine
@@ -95,48 +106,49 @@ func (tw *TimeWheel) ticksTillDie() {
 
 	for {
 		select {
-		case task := <-tw.addChan:
-			if lastBucket, ok := tw.lastBucket[task]; ok {
+		case ele := <-tw.addChan:
+			if lastBucket, ok := tw.lastBucket[ele]; ok {
 				// pre bucket's life is longest
-				if tw.slots.Prev().Value.(*Bucket) == lastBucket {
+				if lastBucket == tw.lifeLongestBucket() {
 					continue
 				}
 
-				// delete prev task in time wheeling
-				lastBucket.deleteTask(task)
-				delete(tw.lastBucket, task)
+				// delete prev ele in time wheeling
+				lastBucket.deleteEle(ele)
+				delete(tw.lastBucket, ele)
 			}
 
-			// save task in longest life's bucket
-			tw.slots.Prev().Value.(*Bucket).addTask(task)
-			tw.lastBucket[task] = tw.slots.Prev().Value.(*Bucket)
+			// save ele in longest life's bucket
+			tw.lifeLongestBucket().addEle(ele)
+			tw.lastBucket[ele] = tw.lifeLongestBucket()
 
-		case task := <-tw.delChan:
-			if lastBucket, ok := tw.lastBucket[task]; ok {
-				// delete prev task in time wheeling
-				lastBucket.deleteTask(task)
-				delete(tw.lastBucket, task)
+		case ele := <-tw.delChan:
+			if lastBucket, ok := tw.lastBucket[ele]; ok {
+				// delete prev ele in time wheeling
+				lastBucket.deleteEle(ele)
+				delete(tw.lastBucket, ele)
 			}
 
 		case <-ticker.C:
-			if tw.debugPrint {
+			if tw.debugLog {
 				n := 0
 				tw.firstSlot.Do(func(bucketInterface interface{}) {
 					bucket := bucketInterface.(*Bucket)
 					symbol := ""
-					if bucket == tw.slots.Value.(*Bucket) {
+					if bucket == tw.currentBucket() {
 						symbol = "<-"
 					}
-					fmt.Printf("[%v] len = %v %v\n", n, len(bucket.tasks), symbol)
+					log.Printf("[%v] len = %v %v\n", n, len(bucket.eles), symbol)
 					n += 1
 				})
+				log.Printf("%v", "===========================================")
 			}
 
-			// stop tasks' life
-			for task, _ := range tw.slots.Value.(*Bucket).tasks {
-				tw.slots.Value.(*Bucket).deleteTask(task)
-				delete(tw.lastBucket, task)
-				tw.onTick(task)
+			// stop eles' life
+			for ele, _ := range tw.currentBucket().eles {
+				tw.currentBucket().deleteEle(ele)
+				delete(tw.lastBucket, ele)
+				tw.onTick(ele)
 			}
 
 			tw.slots = tw.slots.Next()
@@ -150,42 +162,44 @@ func panicOnError(err error) {
 	}
 }
 
-func serverConn(conn net.Conn) {
+func serverConn(conn net.Conn, tw *TimeWheel) {
 	defer conn.Close()
+	tw.add(conn)
 
+	go io.Copy(conn, conn)
 }
 
 func main() {
 
-	//tw := New(10, time.Second*1, func(task interface{}) {
-	//
-	//})
-	//tw.debugPrint = true
-	//
-	//go func(tw *TimeWheel) {
-	//	tw.ticksTillDie()
-	//}(tw)
-	//
-	//tw.add("123")
-	//
-	//time.Sleep(time.Second * 1000)
-	//arg := os.Args
-	//if len(arg) < 2 {
-	//	fmt.Printf("Usage:\n %v listenaddr\nExample:\n %v :10001\n", arg[0], arg[0])
-	//	return
-	//}
-	//
-	//listener, err := net.Listen("tcp", arg[1])
-	//panicOnError(err)
-	//
-	//defer listener.Close()
-	//
-	//for {
-	//	localConn, err := listener.Accept()
-	//	if err != nil {
-	//		continue
-	//	}
-	//
-	//	go serverConn(localConn)
-	//}
+	arg := os.Args
+	if len(arg) < 2 {
+		fmt.Printf("Usage:\n %v listenaddr\nExample:\n %v :10001\n", arg[0], arg[0])
+		return
+	}
+
+	// timer wheel
+	tw := New(10, time.Second*1, func(ele interface{}) {
+		conn := ele.(net.Conn)
+		conn.Close()
+	})
+	tw.debugLog = true
+
+	go func(tw *TimeWheel) {
+		tw.ticksTillDie()
+	}(tw)
+
+	// server
+	listener, err := net.Listen("tcp", arg[1])
+	panicOnError(err)
+
+	defer listener.Close()
+
+	for {
+		localConn, err := listener.Accept()
+		if err != nil {
+			continue
+		}
+
+		go serverConn(localConn, tw)
+	}
 }
