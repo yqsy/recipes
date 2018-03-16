@@ -4,7 +4,6 @@ import (
 	"net"
 	"container/ring"
 	"time"
-	"os"
 	"fmt"
 )
 
@@ -23,6 +22,11 @@ type TimeWheel struct {
 	delChan chan interface{}
 
 	onTick func(interface{})
+
+	// when ticket print whole wheel
+	debugPrint bool
+
+	firstSlot *ring.Ring
 }
 
 func New(ticksPerWheel int, durationPerTick time.Duration, f func(interface{})) *TimeWheel {
@@ -32,14 +36,23 @@ func New(ticksPerWheel int, durationPerTick time.Duration, f func(interface{})) 
 
 	tw := &TimeWheel{
 		slots:           ring.New(ticksPerWheel),
+		lastBucket:      make(map[interface{}]interface{}),
 		durationPerTick: durationPerTick,
-		onTick:          f}
+		addChan:         make(chan interface{}),
+		delChan:         make(chan interface{}),
+		onTick:          f,
+		debugPrint:      false,
+		firstSlot:       nil}
+
+	// init firstSlot for debug print
+	tw.firstSlot = tw.slots
 
 	slotsLen := tw.slots.Len()
 
 	// init slot's each bucket with set[task,task,task...]
 	for i := 0; i < slotsLen; i++ {
-		tw.slots.Value = map[interface{}]struct{}{}
+		tw.slots.Value = make(map[interface{}]struct{})
+		tw.slots = tw.slots.Next()
 	}
 
 	return tw
@@ -66,8 +79,8 @@ func (tw *TimeWheel) ticksTillDie() {
 		select {
 		case task := <-tw.addChan:
 			if lastBucket, ok := tw.lastBucket[task]; ok {
-				// current bucket's life is longest
-				if tw.slots.Value == lastBucket {
+				// pre bucket's life is longest
+				if tw.slots.Prev().Value == lastBucket {
 					continue
 				}
 
@@ -77,7 +90,7 @@ func (tw *TimeWheel) ticksTillDie() {
 			}
 
 			// save task in current bucket
-			tw.slots.Value.(map[interface{}]struct{})[task] = struct{}{}
+			tw.slots.Prev().Value.(map[interface{}]struct{})[task] = struct{}{}
 			tw.lastBucket[task] = tw.slots.Value
 
 		case task := <-tw.delChan:
@@ -89,12 +102,22 @@ func (tw *TimeWheel) ticksTillDie() {
 
 		case <-ticker.C:
 			// stop tasks' life
-
 			for task, _ := range tw.slots.Value.(map[interface{}]struct{}) {
 				delete(tw.slots.Value.(map[interface{}]struct{}), task)
 				delete(tw.lastBucket, task)
 				tw.onTick(task)
 			}
+
+			if tw.debugPrint {
+				n := 0
+				tw.firstSlot.Do(func(value interface{}) {
+					bucket := value.(map[interface{}]struct{})
+					fmt.Printf("[%v] len = %v \n", n, len(bucket))
+					n += 1
+				})
+			}
+
+			tw.slots = tw.slots.Next()
 		}
 	}
 }
@@ -112,6 +135,18 @@ func serverConn(conn net.Conn) {
 
 func main() {
 
+	tw := New(10, time.Second*1, func(task interface{}) {
+		fmt.Println(task)
+	})
+	tw.debugPrint = true
+
+	go func(tw *TimeWheel) {
+		tw.ticksTillDie()
+	}(tw)
+
+	tw.add("123")
+
+	time.Sleep(time.Second * 1000)
 	//arg := os.Args
 	//if len(arg) < 2 {
 	//	fmt.Printf("Usage:\n %v listenaddr\nExample:\n %v :10001\n", arg[0], arg[0])
