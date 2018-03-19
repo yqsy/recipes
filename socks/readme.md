@@ -3,6 +3,7 @@
 - [1. socks](#1-socks)
 - [2. 其他](#2-其他)
 - [3. 单元测试](#3-单元测试)
+    - [3.1. socks4a](#31-socks4a)
 
 <!-- /TOC -->
 
@@ -36,8 +37,9 @@ echo -e '\x04\0x01\0x13\0x8B\0x0\0x0\0x0\0xFF\0x0\0x76\0x6D\0x31\0x0' | nc host1
 
 # debian 
 nc -X 4 -x 127.0.0.1:1080 127.0.0.1 5003
+nc -X 5 -x 127.0.0.1:1080 127.0.0.1 5003
 
-#centos
+# centos(不支持5)
 nc --proxy-type socks4 --proxy 127.0.0.1:1080 127.0.0.1 5003
 ```
 
@@ -45,6 +47,8 @@ nc --proxy-type socks4 --proxy 127.0.0.1:1080 127.0.0.1 5003
 <a id="markdown-3-单元测试" name="3-单元测试"></a>
 # 3. 单元测试
 
+<a id="markdown-31-socks4a" name="31-socks4a"></a>
+## 3.1. socks4a
 正确:
 * socks4 正确性测试
 * socks4a 正确性测试
