@@ -200,7 +200,7 @@ func socksHandle5(localConn net.Conn, bufReader *bufio.Reader) {
 	if err != nil {
 		return
 	}
-	relayTcpUntilDie(localConn, remoteAddr, remoteConn)
+	relayTcpUntilDie(localConn, remoteAddr, remoteConn, bufReader)
 }
 
 func parseDomainAddr(bufReader *bufio.Reader) (string, error) {

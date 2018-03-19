@@ -21,7 +21,6 @@ func dispatch(localConn net.Conn) {
 	} else if firstByte[0] == 0x05 {
 		socksHandle5(localConn, bufReader)
 	}
-
 }
 
 func main() {

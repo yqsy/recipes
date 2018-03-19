@@ -4,6 +4,7 @@ import (
 	"net"
 	"io"
 	"log"
+	"bufio"
 )
 
 func panicOnError(err error) {
@@ -12,16 +13,16 @@ func panicOnError(err error) {
 	}
 }
 
-func relayTcpUntilDie(localConn net.Conn, remoteAddr string, remoteConn net.Conn) {
+func relayTcpUntilDie(localConn net.Conn, remoteAddr string, remoteConn net.Conn, bufReader *bufio.Reader) {
 	log.Printf("relay: %v <-> %v\n", localConn.RemoteAddr(), remoteAddr)
 	done := make(chan bool, 2)
 
-	go func(remoteConn net.Conn, localConn net.Conn, remoteAddr string, done chan bool) {
-		io.Copy(remoteConn, localConn)
+	go func(remoteConn net.Conn, localConn net.Conn, remoteAddr string, bufReader *bufio.Reader, done chan bool) {
+		io.Copy(remoteConn, bufReader)
 		remoteConn.(*net.TCPConn).CloseWrite()
 		log.Printf("done: %v -> %v\n", localConn.RemoteAddr(), remoteAddr)
 		done <- true
-	}(remoteConn, localConn, remoteAddr, done)
+	}(remoteConn, localConn, remoteAddr, bufReader, done)
 
 	go func(localConn net.Conn, remoteConn net.Conn, remoteAddr string, done chan bool) {
 		io.Copy(localConn, remoteConn)

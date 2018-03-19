@@ -121,5 +121,5 @@ func socksHandle4(localConn net.Conn, bufReader *bufio.Reader) {
 		return
 	}
 
-	relayTcpUntilDie(localConn, remoteAddr, remoteConn)
+	relayTcpUntilDie(localConn, remoteAddr, remoteConn, bufReader)
 }

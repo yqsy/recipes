@@ -6,7 +6,6 @@ import (
 	"io"
 	"encoding/binary"
 	"bytes"
-	"bufio"
 	"time"
 )
 
@@ -105,6 +104,8 @@ func init() {
 
 func TestSocks4Simple(t *testing.T) {
 	conn, err := net.Dial("tcp", "127.0.0.1:1080")
+	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -142,6 +143,8 @@ func TestSocks4Simple(t *testing.T) {
 
 func TestSocks4ASimple(t *testing.T) {
 	conn, err := net.Dial("tcp", "127.0.0.1:1080")
+	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -190,6 +193,8 @@ func TestSocks4ASimple(t *testing.T) {
 
 func TestHeadFirstBytes(t *testing.T) {
 	conn, err := net.Dial("tcp", "127.0.0.1:1080")
+	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -203,11 +208,8 @@ func TestHeadFirstBytes(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	writer := bufio.NewWriter(&buf)
-
-	binary.Write(writer, binary.BigEndian, &socks4Req)
+	binary.Write(&buf, binary.BigEndian, &socks4Req)
 	//binary.Write(writer, binary.BigEndian, []byte{0x00}) // username
-	writer.Flush()
 
 	n, err := conn.Write(buf.Bytes())
 
@@ -218,8 +220,6 @@ func TestHeadFirstBytes(t *testing.T) {
 	if n != len(buf.Bytes()) {
 		t.Fatalf("conn.Write err")
 	}
-
-	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
 
 	buffer := make([]byte, 100)
 	n, err = conn.Read(buffer)
@@ -234,6 +234,8 @@ func TestHeadFirstBytes(t *testing.T) {
 
 func TestHeadSecondBytes(t *testing.T) {
 	conn, err := net.Dial("tcp", "127.0.0.1:1080")
+	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -247,11 +249,8 @@ func TestHeadSecondBytes(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	writer := bufio.NewWriter(&buf)
-
-	binary.Write(writer, binary.BigEndian, &socks4Req)
-	//binary.Write(writer, binary.BigEndian, []byte{0x00}) // username
-	writer.Flush()
+	binary.Write(&buf, binary.BigEndian, &socks4Req)
+	//binary.Write(&buf, binary.BigEndian, []byte{0x00}) // username
 
 	n, err := conn.Write(buf.Bytes())
 
@@ -262,8 +261,6 @@ func TestHeadSecondBytes(t *testing.T) {
 	if n != len(buf.Bytes()) {
 		t.Fatalf("conn.Write err")
 	}
-
-	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
 
 	buffer := make([]byte, 100)
 	n, err = conn.Read(buffer)
@@ -278,6 +275,8 @@ func TestHeadSecondBytes(t *testing.T) {
 
 func TestHeadOneByOne(t *testing.T) {
 	conn, err := net.Dial("tcp", "127.0.0.1:1080")
+	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -291,13 +290,10 @@ func TestHeadOneByOne(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	writer := bufio.NewWriter(&buf)
-
-	binary.Write(writer, binary.BigEndian, &socks4Req)
-	binary.Write(writer, binary.BigEndian, []byte{0x00})
-	binary.Write(writer, binary.BigEndian, []byte("localhost"))
-	binary.Write(writer, binary.BigEndian, []byte{0x00})
-	writer.Flush()
+	binary.Write(&buf, binary.BigEndian, &socks4Req)
+	binary.Write(&buf, binary.BigEndian, []byte{0x00})
+	binary.Write(&buf, binary.BigEndian, []byte("localhost"))
+	binary.Write(&buf, binary.BigEndian, []byte{0x00})
 
 	writeBytes := buf.Bytes()[:]
 	for i := 0; i < len(writeBytes); i++ {
@@ -328,6 +324,8 @@ func TestHeadOneByOne(t *testing.T) {
 
 func TestUserLengthAttack(t *testing.T) {
 	conn, err := net.Dial("tcp", "127.0.0.1:1080")
+	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -340,20 +338,17 @@ func TestUserLengthAttack(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	writer := bufio.NewWriter(&buf)
-
-	binary.Write(writer, binary.BigEndian, &socks4Req)
+	binary.Write(&buf, binary.BigEndian, &socks4Req)
 
 	attackBuf := make([]byte, 4096)
 	for i := 0; i < len(attackBuf); i++ {
 		attackBuf[i] = "123456789ABCDEFG"[i%16]
 	}
 
-	writer.Write(attackBuf)
-	binary.Write(writer, binary.BigEndian, []byte{0x00})
-	binary.Write(writer, binary.BigEndian, []byte("localhost"))
-	binary.Write(writer, binary.BigEndian, []byte{0x00})
-	writer.Flush()
+	buf.Write(attackBuf)
+	binary.Write(&buf, binary.BigEndian, []byte{0x00})
+	binary.Write(&buf, binary.BigEndian, []byte("localhost"))
+	binary.Write(&buf, binary.BigEndian, []byte{0x00})
 
 	n, err := conn.Write(buf.Bytes())
 
@@ -364,8 +359,6 @@ func TestUserLengthAttack(t *testing.T) {
 	if n != len(buf.Bytes()) {
 		t.Fatalf("conn.Write err")
 	}
-
-	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
 
 	buffer := make([]byte, 100)
 	n, err = conn.Read(buffer)
@@ -384,6 +377,8 @@ func TestUserLengthAttack(t *testing.T) {
 
 func TestDomainLengthAttack(t *testing.T) {
 	conn, err := net.Dial("tcp", "127.0.0.1:1080")
+	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -396,19 +391,16 @@ func TestDomainLengthAttack(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	writer := bufio.NewWriter(&buf)
-
-	binary.Write(writer, binary.BigEndian, &socks4Req)
+	binary.Write(&buf, binary.BigEndian, &socks4Req)
 
 	attackBuf := make([]byte, 4096)
 	for i := 0; i < len(attackBuf); i++ {
 		attackBuf[i] = "123456789ABCDEFG"[i%16]
 	}
 
-	binary.Write(writer, binary.BigEndian, []byte{0x00})
-	writer.Write(attackBuf)
-	binary.Write(writer, binary.BigEndian, []byte{0x00})
-	writer.Flush()
+	binary.Write(&buf, binary.BigEndian, []byte{0x00})
+	buf.Write(attackBuf)
+	binary.Write(&buf, binary.BigEndian, []byte{0x00})
 
 	n, err := conn.Write(buf.Bytes())
 
@@ -419,8 +411,6 @@ func TestDomainLengthAttack(t *testing.T) {
 	if n != len(buf.Bytes()) {
 		t.Fatalf("conn.Write err")
 	}
-
-	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
 
 	buffer := make([]byte, 100)
 	n, err = conn.Read(buffer)
@@ -435,6 +425,8 @@ func TestDomainLengthAttack(t *testing.T) {
 
 func TestLocalFirstHalfClose(t *testing.T) {
 	conn, err := net.Dial("tcp", "127.0.0.1:1080")
+	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -489,6 +481,8 @@ func TestLocalFirstHalfClose(t *testing.T) {
 
 func TestRemoteFirstHalfClose(t *testing.T) {
 	conn, err := net.Dial("tcp", "127.0.0.1:1080")
+	conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
