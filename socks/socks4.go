@@ -67,11 +67,12 @@ type Socks4Res struct {
 	Ipv4Addr [4]byte
 }
 
-func socksHandle4(localConn net.Conn) {
+func socksHandle4(localConn net.Conn, bufReader *bufio.Reader) {
+
 	var socks4Req Socks4Req
 
 	// read 8 bytes header
-	err := binary.Read(localConn, binary.BigEndian, &socks4Req)
+	err := binary.Read(bufReader, binary.BigEndian, &socks4Req)
 	if err != nil {
 		return
 	}
@@ -80,7 +81,6 @@ func socksHandle4(localConn net.Conn) {
 		return
 	}
 
-	bufReader := bufio.NewReader(localConn)
 	userNameBytes, err := bufReader.ReadSlice(0)
 
 	if err != nil {

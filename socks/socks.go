@@ -17,10 +17,11 @@ func dispatch(localConn net.Conn) {
 	}
 
 	if firstByte[0] == 0x04 {
-		socksHandle4(localConn)
+		socksHandle4(localConn, bufReader)
 	} else if firstByte[0] == 0x05 {
-		socksHandle5(localConn)
+		socksHandle5(localConn, bufReader)
 	}
+
 }
 
 func main() {

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"log"
 	"fmt"
+	"bufio"
 )
 
 type Socks5GreetingReq struct {
@@ -118,12 +119,12 @@ type Socks5Res struct {
 	Port uint16
 }
 
-func socksHandle5(localConn net.Conn) {
+func socksHandle5(localConn net.Conn, bufReader *bufio.Reader) {
 
 	var socks5GreetingReq Socks5GreetingReq
 
 	// read 2 bytes greeting header
-	err := binary.Read(localConn, binary.BigEndian, &socks5GreetingReq)
+	err := binary.Read(bufReader, binary.BigEndian, &socks5GreetingReq)
 	if err != nil {
 		return
 	}
@@ -135,7 +136,7 @@ func socksHandle5(localConn net.Conn) {
 	// read AuthMethods
 	AuthMethods := make([]byte, socks5GreetingReq.MethodSupportedNum)
 
-	err = binary.Read(localConn, binary.BigEndian, AuthMethods)
+	err = binary.Read(bufReader, binary.BigEndian, AuthMethods)
 	if err != nil {
 		return
 	}
@@ -155,7 +156,7 @@ func socksHandle5(localConn net.Conn) {
 	// read socks5 header
 	var socks5Req Socks5Req
 
-	err = binary.Read(localConn, binary.BigEndian, &socks5Req)
+	err = binary.Read(bufReader, binary.BigEndian, &socks5Req)
 	if err != nil {
 		return
 	}
@@ -167,13 +168,13 @@ func socksHandle5(localConn net.Conn) {
 	var remoteAddr string
 
 	if socks5Req.isAddrDomain() {
-		remoteAddr, err = parseDomainAddr(localConn)
+		remoteAddr, err = parseDomainAddr(bufReader)
 		if err != nil {
 			return
 		}
 
 	} else {
-		remoteAddr, err = parseIpAddr(&socks5Req, localConn)
+		remoteAddr, err = parseIpAddr(&socks5Req, bufReader)
 		if err != nil {
 			return
 		}
@@ -202,21 +203,21 @@ func socksHandle5(localConn net.Conn) {
 	relayTcpUntilDie(localConn, remoteAddr, remoteConn)
 }
 
-func parseDomainAddr(localConn net.Conn) (string, error) {
+func parseDomainAddr(bufReader *bufio.Reader) (string, error) {
 	var domainLen byte
-	err := binary.Read(localConn, binary.BigEndian, &domainLen)
+	err := binary.Read(bufReader, binary.BigEndian, &domainLen)
 	if err != nil {
 		return "", err
 	}
 
 	domainBytes := make([]byte, int(domainLen))
-	err = binary.Read(localConn, binary.BigEndian, &domainBytes)
+	err = binary.Read(bufReader, binary.BigEndian, &domainBytes)
 	if err != nil {
 		return "", err
 	}
 
 	var port uint16
-	err = binary.Read(localConn, binary.BigEndian, &port)
+	err = binary.Read(bufReader, binary.BigEndian, &port)
 	if err != nil {
 		return "", err
 	}
@@ -225,7 +226,7 @@ func parseDomainAddr(localConn net.Conn) (string, error) {
 	return remoteAddr, nil
 }
 
-func parseIpAddr(socks5Req *Socks5Req, localConn net.Conn) (string, error) {
+func parseIpAddr(socks5Req *Socks5Req, bufReader *bufio.Reader) (string, error) {
 
 	addressLen := 0
 	// IPv4 address
@@ -237,13 +238,13 @@ func parseIpAddr(socks5Req *Socks5Req, localConn net.Conn) (string, error) {
 
 	addr := make([]byte, addressLen)
 
-	err := binary.Read(localConn, binary.BigEndian, &addr)
+	err := binary.Read(bufReader, binary.BigEndian, &addr)
 	if err != nil {
 		return "", err
 	}
 
 	var port uint16
-	err = binary.Read(localConn, binary.BigEndian, &port)
+	err = binary.Read(bufReader, binary.BigEndian, &port)
 	if err != nil {
 		return "", err
 	}
