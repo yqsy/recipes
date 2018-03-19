@@ -119,7 +119,6 @@ type Socks5Res struct {
 }
 
 func socksHandle5(localConn net.Conn) {
-	defer localConn.Close()
 
 	var socks5GreetingReq Socks5GreetingReq
 
@@ -222,7 +221,7 @@ func parseDomainAddr(localConn net.Conn) (string, error) {
 		return "", err
 	}
 
-	remoteAddr := string(domainBytes) + ":" +fmt.Sprintf("%v", port)
+	remoteAddr := string(domainBytes) + ":" + fmt.Sprintf("%v", port)
 	return remoteAddr, nil
 }
 

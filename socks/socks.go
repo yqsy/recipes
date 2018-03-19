@@ -4,7 +4,24 @@ import (
 	"net"
 	"fmt"
 	"os"
+	"bufio"
 )
+
+func dispatch(localConn net.Conn) {
+	defer localConn.Close()
+
+	bufReader := bufio.NewReader(localConn)
+	firstByte, err := bufReader.Peek(1)
+	if err != nil || len(firstByte) != 1 {
+		return
+	}
+
+	if firstByte[0] == 0x04 {
+		socksHandle4(localConn)
+	} else if firstByte[0] == 0x05 {
+		socksHandle5(localConn)
+	}
+}
 
 func main() {
 	arg := os.Args
@@ -24,6 +41,6 @@ func main() {
 			continue
 		}
 
-		go socksHandle5(localConn)
+		go dispatch(localConn)
 	}
 }

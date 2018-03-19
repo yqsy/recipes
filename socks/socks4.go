@@ -68,8 +68,6 @@ type Socks4Res struct {
 }
 
 func socksHandle4(localConn net.Conn) {
-	defer localConn.Close()
-
 	var socks4Req Socks4Req
 
 	// read 8 bytes header
