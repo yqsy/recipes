@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"fmt"
-	"io"
 )
 
 //  map[ele]struct{} like c++'s unordered_set
@@ -87,9 +86,9 @@ func (tw *TimeWheel) add(ele interface{}) {
 }
 
 // delete ele life bind in TimeWheel
-func (tw *TimeWheel) del(ele interface{}) {
-	tw.delChan <- ele
-}
+//func (tw *TimeWheel) del(ele interface{}) {
+//	tw.delChan <- ele
+//}
 
 func (tw *TimeWheel) lifeLongestBucket() *Bucket {
 	return tw.slots.Prev().Value.(*Bucket)
@@ -122,12 +121,12 @@ func (tw *TimeWheel) ticksTillDie() {
 			tw.lifeLongestBucket().addEle(ele)
 			tw.lastBucket[ele] = tw.lifeLongestBucket()
 
-		case ele := <-tw.delChan:
-			if lastBucket, ok := tw.lastBucket[ele]; ok {
-				// delete prev ele in time wheeling
-				lastBucket.deleteEle(ele)
-				delete(tw.lastBucket, ele)
-			}
+			//case ele := <-tw.delChan:
+			//	if lastBucket, ok := tw.lastBucket[ele]; ok {
+			//		// delete prev ele in time wheeling
+			//		lastBucket.deleteEle(ele)
+			//		delete(tw.lastBucket, ele)
+			//	}
 
 		case <-ticker.C:
 			if tw.debugLog {
@@ -163,10 +162,34 @@ func panicOnError(err error) {
 }
 
 func serverConn(conn net.Conn, tw *TimeWheel) {
-	defer conn.Close()
-	tw.add(conn)
+	go func(conn net.Conn) {
+		defer conn.Close()
+		tw.add(conn)
 
-	go io.Copy(conn, conn)
+		buf := make([]byte, 32*1024)
+
+		for {
+			nr, er := conn.Read(buf)
+
+			if er != nil {
+				return
+			}
+
+			if nr > 0 {
+				tw.add(conn)
+
+				nw, ew := conn.Write(buf[0:nr])
+				if ew != nil {
+					return
+				}
+
+				if nr != nw {
+					return
+				}
+
+			}
+		}
+	}(conn)
 }
 
 func main() {
@@ -179,8 +202,7 @@ func main() {
 
 	// timer wheel
 	tw := New(10, time.Second*1, func(ele interface{}) {
-		conn := ele.(net.Conn)
-		conn.Close()
+		ele.(net.Conn).Close()
 	})
 	tw.debugLog = true
 
