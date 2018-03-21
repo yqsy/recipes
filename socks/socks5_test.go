@@ -392,11 +392,10 @@ func TestSocks5VersionErr(t *testing.T) {
 	}
 
 	buffer := make([]byte, 100)
-	_, err = conn.Read(buffer)
-	if e, ok := err.(net.Error); ok && e.Timeout() {
-		t.Fatalf("remote don't close? %v", err)
-	} else if err != nil {
-		// This was an error, but not a timeout
+	rn, err := conn.Read(buffer)
+
+	if rn > 0 {
+		t.Fatal(rn)
 	}
 }
 
@@ -443,11 +442,11 @@ func TestSocks5CommandCodeErr(t *testing.T) {
 	}
 
 	buffer := make([]byte, 100)
-	_, err = conn.Read(buffer)
-	if e, ok := err.(net.Error); ok && e.Timeout() {
-		t.Fatalf("remote don't close? %v", err)
-	} else if err != nil {
-		// This was an error, but not a timeout
+
+	rn, err := conn.Read(buffer)
+
+	if rn > 0 {
+		t.Fatal(rn)
 	}
 }
 
@@ -494,11 +493,10 @@ func TestSocks5AddressTypeErr(t *testing.T) {
 	}
 
 	buffer := make([]byte, 100)
-	_, err = conn.Read(buffer)
-	if e, ok := err.(net.Error); ok && e.Timeout() {
-		t.Fatalf("remote don't close? %v", err)
-	} else if err != nil {
-		// This was an error, but not a timeout
+	rn, err := conn.Read(buffer)
+
+	if rn > 0 {
+		t.Fatal(rn)
 	}
 
 }

@@ -64,11 +64,31 @@ curl -v http://baidu.com
 <a id="markdown-31-http" name="31-http"></a>
 ## 3.1. http
 
+正确:
+* GET http://xxx.com/ HTTP/1.1\r\n
+* GET / HTTP/1.1\r\n 域名在header
+* 包头一个一个字节传
+
+错误:
+* 第一行不满足3个
+* 没有端口 也没有host
+* 第一行长度攻击
+* header长度攻击
+
 
 <a id="markdown-32-https" name="32-https"></a>
 ## 3.2. https
 
+正确:
+* 普通 CONNECT
 
+错误:
+* 第一行长度攻击
 
 <a id="markdown-4-吞吐量测试" name="4-吞吐量测试"></a>
 # 4. 吞吐量测试
+
+```
+ab
+
+```
