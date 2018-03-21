@@ -119,7 +119,7 @@ type Socks5Res struct {
 	Port uint16
 }
 
-func socksHandle5(localConn net.Conn, bufReader *bufio.Reader) {
+func socks5Handle(localConn net.Conn, bufReader *bufio.Reader) {
 
 	var socks5GreetingReq Socks5GreetingReq
 

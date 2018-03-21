@@ -12,10 +12,12 @@
 
 <a id="markdown-1-socks" name="1-socks"></a>
 # 1. socks
+
+如图是CONNECT的功能.BIND的话不实用,只能accept一个连接,故不做了.
 ```
-                         === raw === server1  
-=== raw === socks server === raw === server2  
-                         === raw === server3  
+                     === raw === server1  
+raw === socks server === raw === server2  
+                     === raw === server3  
 ```
 
 * https://www.openssh.com/txt/rfc1928.txt (socks5)

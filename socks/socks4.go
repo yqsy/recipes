@@ -67,7 +67,7 @@ type Socks4Res struct {
 	Ipv4Addr [4]byte
 }
 
-func socksHandle4(localConn net.Conn, bufReader *bufio.Reader) {
+func socks4Handle(localConn net.Conn, bufReader *bufio.Reader) {
 
 	var socks4Req Socks4Req
 
