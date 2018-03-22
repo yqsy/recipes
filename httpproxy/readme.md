@@ -18,9 +18,9 @@
 * https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Request_methods
 
 ```
-                    ===
-http === http proxy ===
-                    ===
+http ===>            ===> server1  
+http ===> http proxy ===> server2
+http ===>            ===> server3
 ```
 
 http proxy会对第一行以及header进行解析,解析的`目的是得到ip和端口`,然后转发`第一行`,`header`,其余当作tcp流量转发
