@@ -89,6 +89,11 @@ curl -v http://baidu.com
 # 4. 吞吐量测试
 
 ```
-ab
+# 直接连3W qps
+ab -n 100000 -c 10 http://localhost:20001/hello
 
+
+# 通过proxy 1W qps
+go run httpproxy.go :1080 > /dev/zero
+ab -n 100000 -c 10 -X localhost:1080  http://localhost:20001/hello
 ```
