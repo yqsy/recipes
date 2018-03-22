@@ -251,3 +251,7 @@ func TestFirstLineLenAttack(t *testing.T) {
 		// This was an error, but not a timeout
 	}
 }
+
+func TestHttpsSimple(t *testing.T) {
+	// TODO
+}

@@ -72,8 +72,8 @@ curl -v http://baidu.com
 错误:
 * 第一行不满足3个
 * 没有端口 也没有host
-* 第一行长度攻击
-* header长度攻击
+* 第一行长度攻击 (暂时没有,go的http解析模块暂时是无限制增长的)
+* header长度攻击 (暂时没有,go的http解析模块暂时是无限制增长的)
 
 
 <a id="markdown-32-https" name="32-https"></a>
@@ -83,7 +83,7 @@ curl -v http://baidu.com
 * 普通 CONNECT
 
 错误:
-* 第一行长度攻击
+* 第一行长度攻击 (暂时没有,go的http解析模块暂时是无限制增长的)
 
 <a id="markdown-4-吞吐量测试" name="4-吞吐量测试"></a>
 # 4. 吞吐量测试

@@ -3,8 +3,8 @@ package main
 import (
 	"net/http"
 	"fmt"
-	"log"
 	"os"
+	"time"
 )
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -20,5 +20,7 @@ func main() {
 	}
 
 	http.HandleFunc("/", handler)
-	log.Fatal(http.ListenAndServe(arg[1], nil))
+	http.ListenAndServe(arg[1], nil)
+
+	time.Sleep(time.Second * 1000)
 }
