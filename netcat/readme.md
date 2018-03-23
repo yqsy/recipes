@@ -10,9 +10,10 @@
 <a id="markdown-1-netcat" name="1-netcat"></a>
 # 1. netcat
 
-netcat要做到的事情
-* [stdin] -> remote
-* stdout <- [remote]
+```
+[stdin] -> remote
+stdout <- [remote]
+```
 
 正确关闭的方式应该是两种情况:
 

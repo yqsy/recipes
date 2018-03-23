@@ -9,9 +9,10 @@
 <a id="markdown-1-tcprelay" name="1-tcprelay"></a>
 # 1. tcprelay
 
-tcprelay要做到的事情
-* local -> proxy -> remote
-* local <- proxy <- remote
+```
+local -> proxy -> remote
+local <- proxy <- remote
+```
 
 正确关闭的方式应该是(不分先后):
 
