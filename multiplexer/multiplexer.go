@@ -1,26 +1,85 @@
 package main
 
 import (
-	"net"
+	"os"
 	"fmt"
+	"strings"
 )
 
+func panicOnError(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+type Config struct {
+	RemoteAddr string
+	ConnPair   map[string]string // [bind addr]remote bind addr
+}
+
+func parseConfig(arg []string) *Config {
+	if len(arg) < 3 {
+		return nil
+	}
+
+	config := new(Config)
+	config.RemoteAddr = arg[2]
+
+	config.ConnPair = make(map[string]string)
+
+	pairs := strings.Split(arg[1], ";")
+	if len(pairs) < 1 {
+		return nil
+	}
+	for _, pair := range pairs {
+		fourPart := strings.Split(pair, ":")
+
+		if len(fourPart) != 4 {
+			return nil
+		}
+		bindAddr := fourPart[0] + ":" + fourPart[1]
+		remoteBindAddr := fourPart[2] + ":" + fourPart[3]
+
+		config.ConnPair[bindAddr] = remoteBindAddr
+	}
+
+	return config
+}
+
+func printUsage(exec string) {
+	fmt.Printf("Usage:\n"+
+		"%v [bind_address]:port:host:hostport;[...] remotehost:remoteport\n"+
+		"Example:\n"+
+		"%v :5001:localhost:5001 pi1:30000\n", exec, exec)
+}
+
 func main() {
+	arg := os.Args
 
-	remoteConn, err := net.Dial("tcp", "vm1:5003")
-
-	if err != nil {
-		panic(err)
+	if len(arg) < 3 {
+		printUsage(arg[0])
+		return
 	}
 
-	bytes := make([]byte, 20 * 1024 * 1024)
+	config := parseConfig(arg)
 
-	wn,err := remoteConn.Write(bytes)
-
-	fmt.Println(wn)
-
-	if err != nil {
-		panic(err)
+	if config == nil {
+		printUsage(arg[0])
+		return
 	}
+
+	//listener, err := net.Listen("tcp", arg[0])
+	//
+	//panicOnError(err)
+	//
+	//defer listener.Close()
+	//
+	//for {
+	//	_, err := listener.Accept()
+	//	if err != nil {
+	//		continue
+	//	}
+	//
+	//}
 
 }
