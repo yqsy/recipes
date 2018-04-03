@@ -14,7 +14,7 @@ func panicOnError(err error) {
 
 type Config struct {
 	RemoteAddr string
-	ConnPair   map[string]string // [bind addr]remote bind addr
+	ConnPair   map[string]string // [bind addr]remote connect addr
 }
 
 func parseConfig(arg []string) *Config {
@@ -38,9 +38,9 @@ func parseConfig(arg []string) *Config {
 			return nil
 		}
 		bindAddr := fourPart[0] + ":" + fourPart[1]
-		remoteBindAddr := fourPart[2] + ":" + fourPart[3]
+		remoteConnectAddr := fourPart[2] + ":" + fourPart[3]
 
-		config.ConnPair[bindAddr] = remoteBindAddr
+		config.ConnPair[bindAddr] = remoteConnectAddr
 	}
 
 	return config
