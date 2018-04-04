@@ -41,6 +41,9 @@ channel连接本身的思考:
 * multiplexer <- dmux 收到`FIN`, 关闭所有的input, `重连`
 * multiplexer -> dmux 收到`FIN`, 关闭所有的output
 
+---
+
+
 <a id="markdown-2-包头定义" name="2-包头定义"></a>
 # 2. 包头定义
 

@@ -4,7 +4,24 @@ import (
 	"os"
 	"fmt"
 	"strings"
+	"net"
+	"time"
 )
+
+// 作为客户端的全局唯一的channel连接
+var channelConn *net.Conn = nil
+
+type GolbalConn struct {
+	conn *net.Conn
+}
+
+func (globalConn *GolbalConn) setConn(conn *net.Conn) {
+
+}
+
+func (globalConn *GolbalConn) getConn() *net.Conn {
+
+}
 
 func panicOnError(err error) {
 	if err != nil {
@@ -53,6 +70,27 @@ func printUsage(exec string) {
 		"%v :5001:localhost:5001 pi1:30000\n", exec, exec)
 }
 
+// input ==> multiplexer ==> channel
+func serveInput(localConn net.Conn, remoteConnectAddr string) {
+	defer localConn.Close()
+
+}
+
+func serveChannel(remoteAddr string) {
+	// defer remoteConn.Close()
+
+	for {
+		remoteConn, err := net.Dial("tcp", remoteAddr)
+
+		if err != nil {
+			time.Sleep(time.Second * 1)
+			continue
+		}
+
+		channelConn = &remoteConn
+	}
+}
+
 func main() {
 	arg := os.Args
 
@@ -68,18 +106,27 @@ func main() {
 		return
 	}
 
-	//listener, err := net.Listen("tcp", arg[0])
-	//
-	//panicOnError(err)
-	//
-	//defer listener.Close()
-	//
-	//for {
-	//	_, err := listener.Accept()
-	//	if err != nil {
-	//		continue
-	//	}
-	//
-	//}
+	tmpBindAddr := ":5001"
+	tmpRemoteConnectAddr := "localhost:5001"
+	tmpRemoteAddr := "localhost:30000"
+
+	// connect channel
+	go serveChannel(tmpRemoteAddr)
+
+	// accept inputs
+	listener, err := net.Listen("tcp", tmpBindAddr)
+
+	panicOnError(err)
+
+	defer listener.Close()
+
+	for {
+		localConn, err := listener.Accept()
+		if err != nil {
+			continue
+		}
+
+		go serveInput(localConn, tmpRemoteConnectAddr)
+	}
 
 }
