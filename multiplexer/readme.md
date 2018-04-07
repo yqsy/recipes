@@ -2,6 +2,7 @@
 
 - [1. multiplexer dmux](#1-multiplexer-dmux)
 - [2. 包头定义](#2-包头定义)
+- [3. 单元测试](#3-单元测试)
 
 <!-- /TOC -->
 
@@ -37,7 +38,6 @@ dmux关于数据相关思考点(对应上方):
 ---
 
 channel连接本身的思考:
-* `connect`成功,分配id序号至queue
 * multiplexer <- dmux 收到`FIN`, 关闭所有的input, `重连`
 * multiplexer -> dmux 收到`FIN`, 关闭所有的output,  继续`accept` 新连接 处理
 
@@ -56,3 +56,11 @@ channel连接本身的思考:
 command
 * SYN to ip:port\r\n
 * FIN
+
+
+<a id="markdown-3-单元测试" name="3-单元测试"></a>
+# 3. 单元测试
+
+```bash
+go test multiplexer.go multiplexer_test.go
+```
