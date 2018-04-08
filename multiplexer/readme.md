@@ -63,5 +63,5 @@ command
 # 3. 单元测试
 
 ```bash
-go test multiplexer.go multiplexer_test.go
+go test common.go common_test.go
 ```

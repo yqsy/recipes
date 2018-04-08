@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"bufio"
 	"errors"
+	"strings"
 )
 
 var globalSessionConn SessionConn
@@ -199,26 +200,40 @@ func handleChannelPayload(bufReader *bufio.Reader, packetHeader *PacketHeader) e
 	return nil
 }
 
-func main() {
+// :5001:localhost:5001 ==> (:5001, localhost:5001)
+func splitArgv(argv1 string) (string, string, error) {
+	eles := strings.Split(argv1, ":")
+	if len(eles) != 4 {
+		return "", "", errors.New("error parameters")
+	}
+	return eles[0] + ":" + eles[1], eles[2] + ":" + eles[3], nil
+}
 
+func main() {
 	arg := os.Args
 
 	if len(arg) < 3 {
 		printUsage(arg[0])
 		return
 	}
+	// dmux addr
+	remoteAddr := arg[2]
 
-	tmpBindAddr := ":5001"
-	tmpRemoteConnectAddr := "localhost:5001"
-	tmpRemoteAddr := "localhost:30000"
+	// connection mapping
+	bindAddr, remoteConnectAddr, err := splitArgv(arg[1])
+
+	if err != nil {
+		printUsage(arg[0])
+		return
+	}
 
 	// id from 0 ~ 65535
 	globalIdGen.initWithMaxId(65536)
 
-	go readChannelAndWriteInput(tmpRemoteAddr)
+	go readChannelAndWriteInput(remoteAddr)
 
 	// accept inputs
-	listener, err := net.Listen("tcp", tmpBindAddr)
+	listener, err := net.Listen("tcp", bindAddr)
 
 	panicOnError(err)
 
@@ -230,7 +245,7 @@ func main() {
 			continue
 		}
 
-		go readInputAndWriteChannel(inputConn, tmpRemoteConnectAddr)
+		go readInputAndWriteChannel(inputConn, remoteConnectAddr)
 	}
 
 }
