@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"net"
 	"time"
-	"sync"
-	"github.com/pkg/errors"
 	"encoding/binary"
 	"os"
 	"bytes"
+	"bufio"
+	"errors"
 )
 
 var globalSessionConn SessionConn
@@ -17,62 +17,6 @@ var globalIdGen IdGen
 
 var globalInputConns MultiConn
 
-// global unique session connection
-type SessionConn struct {
-	conn net.Conn
-	mtx  sync.Mutex
-}
-
-func (sessionConn *SessionConn) setConn(conn net.Conn) {
-	sessionConn.mtx.Lock()
-	defer sessionConn.mtx.Unlock()
-	sessionConn.conn = conn
-}
-
-func (sessionConn *SessionConn) getConn() net.Conn {
-	sessionConn.mtx.Lock()
-	defer sessionConn.mtx.Unlock()
-	return sessionConn.conn
-}
-
-type IdGen struct {
-	ids []uint32
-	mtx sync.Mutex
-}
-
-func (idGen *IdGen) initWithMaxId(maxId uint32) {
-	idGen.mtx.Lock()
-	defer idGen.mtx.Unlock()
-	for i := uint32(0); i < maxId; i++ {
-		idGen.ids = append(idGen.ids, i)
-	}
-}
-
-func (idGen *IdGen) getFreeId() (uint32, error) {
-	idGen.mtx.Lock()
-	defer idGen.mtx.Unlock()
-
-	if len(idGen.ids) < 1 {
-		return 0, errors.New("no enough ids")
-	}
-
-	freeId := idGen.ids[0]
-	idGen.ids = idGen.ids[1:]
-	return freeId, nil
-}
-
-func (idGen *IdGen) releaseFreeId(freeId uint32) {
-	idGen.mtx.Lock()
-	defer idGen.mtx.Unlock()
-	idGen.ids = append(idGen.ids, freeId)
-}
-
-func (idGen *IdGen) getFreeIdNum() int {
-	idGen.mtx.Lock()
-	defer idGen.mtx.Unlock()
-	return len(idGen.ids)
-}
-
 func printUsage(exec string) {
 	fmt.Printf("Usage:\n"+
 		"%v [bind_address]:port:host:hostport remotehost:remoteport\n"+
@@ -80,66 +24,58 @@ func printUsage(exec string) {
 		"%v :5001:localhost:5001 pi1:30000\n", exec, exec)
 }
 
-// input or output connections
-type MultiConn struct {
-	idAndConn map[uint32]net.Conn
-	mtx       sync.Mutex
-	done      chan struct{}
-}
-
-func (multiConn *MultiConn) addConn(id uint32, conn net.Conn) {
-	multiConn.mtx.Lock()
-	defer multiConn.mtx.Unlock()
-	multiConn.idAndConn[id] = conn
-}
-
-func (multiConn *MultiConn) delConn(id uint32) {
-	multiConn.mtx.Lock()
-	defer multiConn.mtx.Unlock()
-	delete(multiConn.idAndConn, id)
-}
-
 // input ==> multiplexer ==> channel
 func readInputAndWriteChannel(inputConn net.Conn, remoteConnectAddr string) {
-	if !writeSynToChannel(remoteConnectAddr) {
-		inputConn.Close()
-		return
-	}
+	defer inputConn.Close()
 
-	for {
-		buf := make([]byte, 16384)
-		_, err := inputConn.Read(buf)
-
-		if err != nil {
-			// write eof to channel
-		}
-	}
-}
-
-func writeSynToChannel(remoteConnectAddr string) bool {
 	id, err := globalIdGen.getFreeId()
 	if err != nil {
-		return false
+		return
 	}
 	defer globalIdGen.releaseFreeId(id)
 
-	// send SYN to channel
-	synReq := generateSynReq(id, remoteConnectAddr)
-
 	sessionConn := globalSessionConn.getConn()
 	if sessionConn == nil {
-		return false
+		return
 	}
 
+	// add conn to global map
+	globalInputConns.addConn(id, inputConn)
+	defer globalInputConns.delConn(id)
+
+	// send SYN to channel
+	synReq := generateSynReq(id, remoteConnectAddr)
 	wn, err := sessionConn.Write(synReq)
-	if err != nil {
-		return false
+	if wn != len(synReq) || err != nil {
+		return
 	}
 
-	if wn != len(synReq) {
-		return false
+	buf := make([]byte, 16384)
+	for {
+		rn, err := inputConn.Read(buf)
+
+		if err != nil {
+			// send FIN to channel
+			finReq := generateFinReq(id)
+			wn, err = sessionConn.Write(finReq)
+			if wn != len(finReq) || err != nil {
+				return
+			}
+
+			globalInputConns.addDone(id)
+			break
+		}
+
+		// send payload to channel
+		payloadReq := generatePayload(id, buf[:rn])
+
+		wn, err = sessionConn.Write(payloadReq)
+		if wn != len(payloadReq) || err != nil {
+			return
+		}
 	}
-	return true
+
+	globalInputConns.waitUntilDie(id)
 }
 
 func generateSynReq(id uint32, remoteConnectAddr string) []byte {
@@ -151,8 +87,8 @@ func generateSynReq(id uint32, remoteConnectAddr string) []byte {
 	packetHeader.Cmd = true
 
 	var buf bytes.Buffer
-	buf.WriteString(cmd)
 	binary.Write(&buf, binary.BigEndian, &packetHeader)
+	buf.WriteString(cmd)
 
 	return buf.Bytes()
 }
@@ -160,41 +96,107 @@ func generateSynReq(id uint32, remoteConnectAddr string) []byte {
 // input <== multiplexer <== channel
 func readChannelAndWriteInput(remoteAddr string) {
 	for {
-		remoteConn, err := net.Dial("tcp", remoteAddr)
+		channelConn, err := net.Dial("tcp", remoteAddr)
 
 		if err != nil {
 			time.Sleep(time.Second * 1)
 			continue
 		}
 
-		globalSessionConn.setConn(remoteConn)
+		globalSessionConn.setConn(channelConn)
 
-		_ = readChannelAndWriteInputDetial(remoteConn)
+		_ = readChannelAndWriteInputDetial(channelConn)
+
 		// err occurred
-		// delete all input and reconnect
+		globalInputConns.shutWriteAllConns()
 	}
 }
 
 func readChannelAndWriteInputDetial(remoteConn net.Conn) error {
 	defer remoteConn.Close()
 
+	bufReader := bufio.NewReader(remoteConn)
+
 	for {
 		var packetHeader PacketHeader
-		err := binary.Read(remoteConn, binary.BigEndian, &packetHeader)
+		err := binary.Read(bufReader, binary.BigEndian, &packetHeader)
 		if err != nil {
 			return err
 		}
 
 		if packetHeader.Cmd == true {
-			handleCmd(remoteConn)
+
+			err := handleChannelCmd(bufReader, &packetHeader)
+
+			if err != nil {
+				return err
+			}
+
 		} else {
 			// handle payload
+
+			err := handleChannelPayload(bufReader, &packetHeader)
+
+			if err != nil {
+				return err
+			}
 		}
 	}
 }
 
-func handleCmd(remoteConn net.Conn) {
+func handleChannelCmd(bufReader *bufio.Reader, packetHeader *PacketHeader) error {
+	line, err := bufReader.ReadSlice('\n')
+	if err != nil {
+		return err
+	}
 
+	// remove "\r"
+	if len(line) < 1 {
+		return errors.New("command too short")
+	}
+
+	line = line[:len(line)-1]
+
+	if string(line) == "FIN" {
+		inputConn := globalInputConns.getConn(packetHeader.Id)
+
+		if inputConn == nil {
+			return errors.New("Impossible!")
+		}
+
+		inputConn.(*net.TCPConn).CloseWrite()
+		globalInputConns.addDone(packetHeader.Id)
+
+		// FIN ok!
+		return nil
+	} else {
+		return errors.New("only support FIN command")
+	}
+}
+
+func handleChannelPayload(bufReader *bufio.Reader, packetHeader *PacketHeader) error {
+	buf := make([]byte, 16384)
+	rn, err := bufReader.Read(buf)
+
+	if err != nil {
+		return err
+	}
+
+	go func(packetHeader *PacketHeader, buf []byte) {
+		inputConn := globalInputConns.getConn(packetHeader.Id)
+
+		if inputConn == nil {
+			return
+		}
+
+		wn, err := inputConn.Write(buf)
+		if err != nil || wn != len(buf) {
+			return
+		}
+
+	}(packetHeader, buf[:rn])
+
+	return nil
 }
 
 func main() {
