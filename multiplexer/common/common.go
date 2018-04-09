@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"log"
 )
 
 func PanicOnError(err error) {
@@ -107,17 +108,26 @@ func (multiConn *MultiConn) WaitUntilDie(id uint32) {
 	}
 }
 
-// input <== channel <== output  all connection half close
-func (multiConn *MultiConn) ShutWriteAllConns() {
+// input [<==] channel <== output  all connection half close
+// or
+// input ==> channel [==>] output all connection half close
+func (multiConn *MultiConn) ShutWriteAllConns(channelConn net.Conn, multiplexer bool) {
 	multiConn.mtx.Lock()
 	defer multiConn.mtx.Unlock()
 
-	for _, conn := range multiConn.idAndConn {
+	for id, conn := range multiConn.idAndConn {
 		conn.(*net.TCPConn).CloseWrite()
-	}
+		if done, ok := multiConn.idAndDone[id]; ok {
+			done <- struct{}{}
+			if multiplexer {
+				log.Printf("[%v]done: %v <- %v(channel)", id, conn.RemoteAddr(), channelConn.RemoteAddr())
+			} else {
+				log.Printf("[%v]done: (channel)%v -> %v", id, conn.LocalAddr(), conn.RemoteAddr())
+			}
 
-	for _, done := range multiConn.idAndDone {
-		done <- struct{}{}
+		} else {
+			panic("impossible")
+		}
 	}
 }
 

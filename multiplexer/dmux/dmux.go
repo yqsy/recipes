@@ -9,6 +9,7 @@ import (
 	"errors"
 
 	"github.com/yqsy/recipes/multiplexer/common"
+	"log"
 )
 
 var globalSessionConn common.SessionConn
@@ -37,10 +38,13 @@ func readOutputAndWriteChannel(outputConn net.Conn, id uint32) {
 			finReq := common.GenerateFinReq(id)
 			wn, err := sessionConn.Write(finReq)
 			if wn != len(finReq) || err != nil {
-				return
+				globalOutputConns.AddDone(id)
+				log.Printf("[%v]force done: (channel)%v <- %v\n", id, outputConn.LocalAddr(), outputConn.RemoteAddr())
+				break
 			}
 
 			globalOutputConns.AddDone(id)
+			log.Printf("[%v]done: (channel)%v <- %v\n", id, outputConn.LocalAddr(), outputConn.RemoteAddr())
 			break
 		}
 
@@ -49,7 +53,9 @@ func readOutputAndWriteChannel(outputConn net.Conn, id uint32) {
 
 		wn, err := sessionConn.Write(payloadReq)
 		if wn != len(payloadReq) || err != nil {
-			return
+			globalOutputConns.AddDone(id)
+			log.Printf("[%v]force done: (channel)%v <- %v\n", id, outputConn.LocalAddr(), outputConn.RemoteAddr())
+			break
 		}
 	}
 
@@ -65,23 +71,27 @@ func readChannelAndWriteOutput(listenAddr string) {
 	defer listener.Close()
 
 	for {
-		channelConn, err := listener.Accept()
+		sessionConn, err := listener.Accept()
 
 		common.PanicOnError(err)
 
-		globalSessionConn.SetConn(channelConn)
+		globalSessionConn.SetConn(sessionConn)
 
-		_ = readChannelAndWriteOutputDetial(channelConn)
+		log.Printf("session establish\n")
+
+		_ = readChannelAndWriteOutputDetial(sessionConn)
 
 		// err occurred
-		globalOutputConns.ShutWriteAllConns()
+		globalOutputConns.ShutWriteAllConns(nil, false)
+
+		log.Printf("begin reaccept to %v\n", listenAddr)
 	}
 }
 
-func readChannelAndWriteOutputDetial(channelConn net.Conn) error {
-	defer channelConn.Close()
+func readChannelAndWriteOutputDetial(sessionConn net.Conn) error {
+	defer sessionConn.Close()
 
-	bufReader := bufio.NewReader(channelConn)
+	bufReader := bufio.NewReader(sessionConn)
 
 	for {
 		var packetHeader common.PacketHeader
@@ -132,7 +142,7 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 		}
 
 		remoteAddr := line[4:]
-		outPutConn, err := net.Dial("tcp", string(remoteAddr))
+		outputConn, err := net.Dial("tcp", string(remoteAddr))
 		if err != nil {
 
 			finReq := common.GenerateFinReq(packetHeader.Id)
@@ -151,19 +161,25 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 			return nil
 		}
 
-		globalOutputConns.AddConn(packetHeader.Id, outPutConn)
-		go readOutputAndWriteChannel(outPutConn, packetHeader.Id)
+		globalOutputConns.AddConn(packetHeader.Id, outputConn)
+
+		log.Printf("[%v]relay: (channel)%v <-> %v\n", packetHeader.Id, outputConn.LocalAddr(), outputConn.RemoteAddr())
+
+		go readOutputAndWriteChannel(outputConn, packetHeader.Id)
 
 	} else if string(line[:3]) == "FIN" {
 
 		outPutConn := globalOutputConns.GetConn(packetHeader.Id)
 
 		if outPutConn == nil {
-			return errors.New("Impossible!")
+			// may be output not connected
+			return nil
 		}
 
 		outPutConn.(*net.TCPConn).CloseWrite()
 		globalOutputConns.AddDone(packetHeader.Id)
+
+		log.Printf("[%v]done: (channel)%v -> %v\n", packetHeader.Id, outPutConn.LocalAddr(), outPutConn.RemoteAddr())
 
 	} else {
 		return errors.New("non supported command")

@@ -10,7 +10,7 @@ import (
 	"bufio"
 	"errors"
 	"strings"
-
+	"log"
 	"github.com/yqsy/recipes/multiplexer/common"
 )
 
@@ -44,7 +44,10 @@ func readInputAndWriteChannel(inputConn net.Conn, remoteConnectAddr string) {
 
 	// add conn to global map
 	globalInputConns.AddConn(id, inputConn)
-	defer globalInputConns.DelConn(id)
+	defer func() {
+		globalInputConns.DelConn(id)
+		log.Printf("freeid:%v reminder: %v\n", id, globalIdGen.GetFreeIdNum())
+	}()
 
 	// send SYN to channel
 	synReq := generateSynReq(id, remoteConnectAddr)
@@ -52,6 +55,8 @@ func readInputAndWriteChannel(inputConn net.Conn, remoteConnectAddr string) {
 	if wn != len(synReq) || err != nil {
 		return
 	}
+
+	log.Printf("[%v]relay: %v <-> %v(channel)\n", id, inputConn.RemoteAddr(), sessionConn.RemoteAddr())
 
 	buf := make([]byte, 16384)
 	for {
@@ -62,10 +67,13 @@ func readInputAndWriteChannel(inputConn net.Conn, remoteConnectAddr string) {
 			finReq := common.GenerateFinReq(id)
 			wn, err = sessionConn.Write(finReq)
 			if wn != len(finReq) || err != nil {
-				return
+				globalInputConns.AddDone(id)
+				log.Printf("[%v]force done: %v -> %v(channel)\n", id, inputConn.RemoteAddr(), sessionConn.RemoteAddr())
+				break
 			}
 
 			globalInputConns.AddDone(id)
+			log.Printf("[%v]done: %v -> %v(channel)\n", id, inputConn.RemoteAddr(), sessionConn.RemoteAddr())
 			break
 		}
 
@@ -74,7 +82,9 @@ func readInputAndWriteChannel(inputConn net.Conn, remoteConnectAddr string) {
 
 		wn, err = sessionConn.Write(payloadReq)
 		if wn != len(payloadReq) || err != nil {
-			return
+			globalInputConns.AddDone(id)
+			log.Printf("[%v]force done: %v -> %v(channel)\n", id, inputConn.RemoteAddr(), sessionConn.RemoteAddr())
+			break
 		}
 	}
 
@@ -99,26 +109,30 @@ func generateSynReq(id uint32, remoteConnectAddr string) []byte {
 // input <== multiplexer <== channel
 func readChannelAndWriteInput(remoteAddr string) {
 	for {
-		channelConn, err := net.Dial("tcp", remoteAddr)
+		sessionConn, err := net.Dial("tcp", remoteAddr)
 
 		if err != nil {
 			time.Sleep(time.Second * 1)
 			continue
 		}
 
-		globalSessionConn.SetConn(channelConn)
+		globalSessionConn.SetConn(sessionConn)
 
-		_ = readChannelAndWriteInputDetial(channelConn)
+		log.Printf("session establish\n")
+
+		_ = readChannelAndWriteInputDetial(sessionConn)
 
 		// err occurred
-		globalInputConns.ShutWriteAllConns()
+		globalInputConns.ShutWriteAllConns(sessionConn, true)
+
+		log.Printf("begin reconnect to %v\n", remoteAddr)
 	}
 }
 
-func readChannelAndWriteInputDetial(remoteConn net.Conn) error {
-	defer remoteConn.Close()
+func readChannelAndWriteInputDetial(sessionConn net.Conn) error {
+	defer sessionConn.Close()
 
-	bufReader := bufio.NewReader(remoteConn)
+	bufReader := bufio.NewReader(sessionConn)
 
 	for {
 		var packetHeader common.PacketHeader
@@ -129,7 +143,7 @@ func readChannelAndWriteInputDetial(remoteConn net.Conn) error {
 
 		if packetHeader.Cmd == true {
 
-			err := handleChannelCmd(bufReader, &packetHeader)
+			err := handleChannelCmd(bufReader, &packetHeader, sessionConn)
 
 			if err != nil {
 				return err
@@ -147,7 +161,7 @@ func readChannelAndWriteInputDetial(remoteConn net.Conn) error {
 	}
 }
 
-func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader) error {
+func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader, sessionConn net.Conn) error {
 	line, err := bufReader.ReadSlice('\n')
 	if err != nil {
 		return err
@@ -169,6 +183,8 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 
 		inputConn.(*net.TCPConn).CloseWrite()
 		globalInputConns.AddDone(packetHeader.Id)
+
+		log.Printf("[%v]done: %v <- %v(channel)\n", packetHeader.Id, inputConn.RemoteAddr(), sessionConn.RemoteAddr())
 
 		// FIN ok!
 		return nil
