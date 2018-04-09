@@ -120,9 +120,9 @@ func (multiConn *MultiConn) ShutWriteAllConns(channelConn net.Conn, multiplexer 
 		if done, ok := multiConn.idAndDone[id]; ok {
 			done <- struct{}{}
 			if multiplexer {
-				log.Printf("[%v]done: %v <- %v(channel)", id, conn.RemoteAddr(), channelConn.RemoteAddr())
+				log.Printf("[%v]session force done: %v <- %v(channel)", id, conn.RemoteAddr(), channelConn.RemoteAddr())
 			} else {
-				log.Printf("[%v]done: (channel)%v -> %v", id, conn.LocalAddr(), conn.RemoteAddr())
+				log.Printf("[%v]session force done: (channel)%v -> %v", id, conn.LocalAddr(), conn.RemoteAddr())
 			}
 
 		} else {

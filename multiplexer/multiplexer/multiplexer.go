@@ -230,6 +230,8 @@ func splitArgv(argv1 string) (string, string, error) {
 }
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	arg := os.Args
 
 	if len(arg) < 3 {

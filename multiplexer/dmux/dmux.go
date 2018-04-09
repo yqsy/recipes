@@ -216,6 +216,8 @@ func handleChannelPayload(bufReader *bufio.Reader, packetHeader *common.PacketHe
 }
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	arg := os.Args
 
 	if len(arg) < 2 {
