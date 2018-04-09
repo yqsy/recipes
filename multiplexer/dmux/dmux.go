@@ -39,7 +39,7 @@ func readOutputAndWriteChannel(outputConn net.Conn, id uint32) {
 			wn, err := sessionConn.Write(finReq)
 			if wn != len(finReq) || err != nil {
 				globalOutputConns.AddDone(id)
-				log.Printf("[%v]force done: (channel)%v <- %v\n", id, outputConn.LocalAddr(), outputConn.RemoteAddr())
+				log.Printf("[%v]force done: (channel)%v <- %v err: %v\n", id, outputConn.LocalAddr(), outputConn.RemoteAddr(), err)
 				break
 			}
 
@@ -54,7 +54,7 @@ func readOutputAndWriteChannel(outputConn net.Conn, id uint32) {
 		wn, err := sessionConn.Write(payloadReq)
 		if wn != len(payloadReq) || err != nil {
 			globalOutputConns.AddDone(id)
-			log.Printf("[%v]force done: (channel)%v <- %v\n", id, outputConn.LocalAddr(), outputConn.RemoteAddr())
+			log.Printf("[%v]force done: (channel)%v <- %v err: %v\n", id, outputConn.LocalAddr(), outputConn.RemoteAddr(), err)
 			break
 		}
 	}
@@ -173,6 +173,8 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 
 		if outPutConn == nil {
 			// may be output not connected
+
+			log.Printf("not find %v\n", packetHeader.Id)
 			return nil
 		}
 

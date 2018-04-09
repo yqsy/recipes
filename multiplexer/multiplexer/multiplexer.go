@@ -68,7 +68,7 @@ func readInputAndWriteChannel(inputConn net.Conn, remoteConnectAddr string) {
 			wn, err = sessionConn.Write(finReq)
 			if wn != len(finReq) || err != nil {
 				globalInputConns.AddDone(id)
-				log.Printf("[%v]force done: %v -> %v(channel)\n", id, inputConn.RemoteAddr(), sessionConn.RemoteAddr())
+				log.Printf("[%v]force done: %v -> %v(channel) err: %v\n", id, inputConn.RemoteAddr(), sessionConn.RemoteAddr(), err)
 				break
 			}
 
@@ -83,7 +83,7 @@ func readInputAndWriteChannel(inputConn net.Conn, remoteConnectAddr string) {
 		wn, err = sessionConn.Write(payloadReq)
 		if wn != len(payloadReq) || err != nil {
 			globalInputConns.AddDone(id)
-			log.Printf("[%v]force done: %v -> %v(channel)\n", id, inputConn.RemoteAddr(), sessionConn.RemoteAddr())
+			log.Printf("[%v]force done: %v -> %v(channel) err: %v\n", id, inputConn.RemoteAddr(), sessionConn.RemoteAddr(), err)
 			break
 		}
 	}
