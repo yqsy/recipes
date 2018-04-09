@@ -55,7 +55,7 @@ channel连接本身的思考:
 
 ---
 command
-* SYN to ip:port\r\n
+* SYN ip:port\r\n
 * FIN\r\n
 
 
@@ -63,5 +63,6 @@ command
 # 3. 单元测试
 
 ```bash
+cd common
 go test common.go common_test.go
 ```

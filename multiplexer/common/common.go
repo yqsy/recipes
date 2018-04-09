@@ -1,4 +1,4 @@
-package main
+package common
 
 import (
 	"net"
@@ -8,7 +8,7 @@ import (
 	"errors"
 )
 
-func panicOnError(err error) {
+func PanicOnError(err error) {
 	if err != nil {
 		panic(err)
 	}
@@ -38,13 +38,13 @@ type SessionConn struct {
 	mtx  sync.Mutex
 }
 
-func (sessionConn *SessionConn) setConn(conn net.Conn) {
+func (sessionConn *SessionConn) SetConn(conn net.Conn) {
 	sessionConn.mtx.Lock()
 	defer sessionConn.mtx.Unlock()
 	sessionConn.conn = conn
 }
 
-func (sessionConn *SessionConn) getConn() net.Conn {
+func (sessionConn *SessionConn) GetConn() net.Conn {
 	sessionConn.mtx.Lock()
 	defer sessionConn.mtx.Unlock()
 	return sessionConn.conn
@@ -57,14 +57,21 @@ type MultiConn struct {
 	mtx       sync.Mutex
 }
 
-func (multiConn *MultiConn) addConn(id uint32, conn net.Conn) {
+func NewMultiConn() *MultiConn {
+	multiConn := &MultiConn{}
+	multiConn.idAndConn = make(map[uint32]net.Conn)
+	multiConn.idAndDone = make(map[uint32]chan struct{})
+	return multiConn
+}
+
+func (multiConn *MultiConn) AddConn(id uint32, conn net.Conn) {
 	multiConn.mtx.Lock()
 	defer multiConn.mtx.Unlock()
 	multiConn.idAndConn[id] = conn
 	multiConn.idAndDone[id] = make(chan struct{}, 2)
 }
 
-func (multiConn *MultiConn) getConn(id uint32) net.Conn {
+func (multiConn *MultiConn) GetConn(id uint32) net.Conn {
 	multiConn.mtx.Lock()
 	defer multiConn.mtx.Unlock()
 	if conn, ok := multiConn.idAndConn[id]; ok {
@@ -73,14 +80,14 @@ func (multiConn *MultiConn) getConn(id uint32) net.Conn {
 	return nil
 }
 
-func (multiConn *MultiConn) delConn(id uint32) {
+func (multiConn *MultiConn) DelConn(id uint32) {
 	multiConn.mtx.Lock()
 	defer multiConn.mtx.Unlock()
 	delete(multiConn.idAndConn, id)
 	delete(multiConn.idAndDone, id)
 }
 
-func (multiConn *MultiConn) addDone(id uint32) {
+func (multiConn *MultiConn) AddDone(id uint32) {
 	multiConn.mtx.Lock()
 	defer multiConn.mtx.Unlock()
 	if done, ok := multiConn.idAndDone[id]; ok {
@@ -91,7 +98,7 @@ func (multiConn *MultiConn) addDone(id uint32) {
 // input ==> channel ==> output  half close
 // input <== channel <== output  half close
 // close socket
-func (multiConn *MultiConn) waitUntilDie(id uint32) {
+func (multiConn *MultiConn) WaitUntilDie(id uint32) {
 	multiConn.mtx.Lock()
 	var done = multiConn.idAndDone[id]
 	multiConn.mtx.Unlock()
@@ -101,7 +108,7 @@ func (multiConn *MultiConn) waitUntilDie(id uint32) {
 }
 
 // input <== channel <== output  all connection half close
-func (multiConn *MultiConn) shutWriteAllConns() {
+func (multiConn *MultiConn) ShutWriteAllConns() {
 	multiConn.mtx.Lock()
 	defer multiConn.mtx.Unlock()
 
@@ -119,7 +126,7 @@ type IdGen struct {
 	mtx sync.Mutex
 }
 
-func (idGen *IdGen) initWithMaxId(maxId uint32) {
+func (idGen *IdGen) InitWithMaxId(maxId uint32) {
 	idGen.mtx.Lock()
 	defer idGen.mtx.Unlock()
 	for i := uint32(0); i < maxId; i++ {
@@ -127,7 +134,7 @@ func (idGen *IdGen) initWithMaxId(maxId uint32) {
 	}
 }
 
-func (idGen *IdGen) getFreeId() (uint32, error) {
+func (idGen *IdGen) GetFreeId() (uint32, error) {
 	idGen.mtx.Lock()
 	defer idGen.mtx.Unlock()
 
@@ -140,19 +147,19 @@ func (idGen *IdGen) getFreeId() (uint32, error) {
 	return freeId, nil
 }
 
-func (idGen *IdGen) releaseFreeId(freeId uint32) {
+func (idGen *IdGen) ReleaseFreeId(freeId uint32) {
 	idGen.mtx.Lock()
 	defer idGen.mtx.Unlock()
 	idGen.ids = append(idGen.ids, freeId)
 }
 
-func (idGen *IdGen) getFreeIdNum() int {
+func (idGen *IdGen) GetFreeIdNum() int {
 	idGen.mtx.Lock()
 	defer idGen.mtx.Unlock()
 	return len(idGen.ids)
 }
 
-func generateFinReq(id uint32) []byte {
+func GenerateFinReq(id uint32) []byte {
 	cmd := "FIN\r\n"
 	var packetHeader PacketHeader
 	packetHeader.Len = uint32(len(cmd))
@@ -165,11 +172,11 @@ func generateFinReq(id uint32) []byte {
 	return buf.Bytes()
 }
 
-func generatePayload(id uint32, payload []byte) []byte {
+func GeneratePayload(id uint32, payload []byte) []byte {
 	var packetHeader PacketHeader
 	packetHeader.Len = uint32(len(payload))
 	packetHeader.Id = id
-	packetHeader.Cmd = true
+	packetHeader.Cmd = false
 
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.BigEndian, &packetHeader)

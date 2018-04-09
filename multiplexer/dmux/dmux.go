@@ -1,4 +1,4 @@
-package dmux
+package main
 
 import (
 	"os"
@@ -13,7 +13,7 @@ import (
 
 var globalSessionConn common.SessionConn
 
-var globalOutputConns common.MultiConn
+var globalOutputConns *common.MultiConn
 
 // channel <== dmux <== output
 func readOutputAndWriteChannel(outputConn net.Conn, id uint32) {
@@ -119,19 +119,19 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 		return err
 	}
 
-	// remove "\r"
-	if len(line) < 1 {
+	// remove "\r\n"
+	if len(line) < 2 {
 		return errors.New("command too short")
 	}
 
-	line = line[:len(line)-1]
-
-	if len(line) < 4 {
-		return errors.New("command too short")
-	}
+	line = line[:len(line)-2]
 
 	if string(line[:3]) == "SYN" {
-		remoteAddr := line[3 : len(line)-3]
+		if len(line) < 5 {
+			return errors.New("command too short")
+		}
+
+		remoteAddr := line[4:]
 		outPutConn, err := net.Dial("tcp", string(remoteAddr))
 		if err != nil {
 
@@ -195,7 +195,6 @@ func handleChannelPayload(bufReader *bufio.Reader, packetHeader *common.PacketHe
 	}(packetHeader, buf[:rn])
 
 	return nil
-
 }
 
 func main() {
@@ -205,6 +204,8 @@ func main() {
 		fmt.Printf("Usage:\n %v listenaddr\nExample:\n %v :30000\n", arg[0], arg[0])
 		return
 	}
+
+	globalOutputConns = common.NewMultiConn()
 
 	readChannelAndWriteOutput(arg[1])
 }
