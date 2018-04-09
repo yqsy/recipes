@@ -1,4 +1,4 @@
-package main
+package dmux
 
 import (
 	"os"
@@ -7,19 +7,21 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
+
+	"github.com/yqsy/recipes/multiplexer/common"
 )
 
-var globalSessionConn SessionConn
+var globalSessionConn common.SessionConn
 
-var globalOutputConns MultiConn
+var globalOutputConns common.MultiConn
 
 // channel <== dmux <== output
 func readOutputAndWriteChannel(outputConn net.Conn, id uint32) {
 	defer outputConn.Close()
 
-	defer globalOutputConns.delConn(id)
+	defer globalOutputConns.DelConn(id)
 
-	sessionConn := globalSessionConn.getConn()
+	sessionConn := globalSessionConn.GetConn()
 	if sessionConn == nil {
 		// Impossible
 		return
@@ -32,18 +34,18 @@ func readOutputAndWriteChannel(outputConn net.Conn, id uint32) {
 		if err != nil {
 			// send FIN to channel
 
-			finReq := generateFinReq(id)
+			finReq := common.GenerateFinReq(id)
 			wn, err := sessionConn.Write(finReq)
 			if wn != len(finReq) || err != nil {
 				return
 			}
 
-			globalOutputConns.addDone(id)
+			globalOutputConns.AddDone(id)
 			break
 		}
 
 		// send payload to channel
-		payloadReq := generatePayload(id, buf[:rn])
+		payloadReq := common.GeneratePayload(id, buf[:rn])
 
 		wn, err := sessionConn.Write(payloadReq)
 		if wn != len(payloadReq) || err != nil {
@@ -51,28 +53,28 @@ func readOutputAndWriteChannel(outputConn net.Conn, id uint32) {
 		}
 	}
 
-	globalOutputConns.waitUntilDie(id)
+	globalOutputConns.WaitUntilDie(id)
 }
 
 // channel ==> dmux ==> output
 func readChannelAndWriteOutput(listenAddr string) {
 	listener, err := net.Listen("tcp", listenAddr)
 
-	panicOnError(err)
+	common.PanicOnError(err)
 
 	defer listener.Close()
 
 	for {
 		channelConn, err := listener.Accept()
 
-		panicOnError(err)
+		common.PanicOnError(err)
 
-		globalSessionConn.setConn(channelConn)
+		globalSessionConn.SetConn(channelConn)
 
 		_ = readChannelAndWriteOutputDetial(channelConn)
 
 		// err occurred
-		globalOutputConns.shutWriteAllConns()
+		globalOutputConns.ShutWriteAllConns()
 	}
 }
 
@@ -82,7 +84,7 @@ func readChannelAndWriteOutputDetial(channelConn net.Conn) error {
 	bufReader := bufio.NewReader(channelConn)
 
 	for {
-		var packetHeader PacketHeader
+		var packetHeader common.PacketHeader
 
 		err := binary.Read(bufReader, binary.BigEndian, &packetHeader)
 		if err != nil {
@@ -111,7 +113,7 @@ func readChannelAndWriteOutputDetial(channelConn net.Conn) error {
 	return nil
 }
 
-func handleChannelCmd(bufReader *bufio.Reader, packetHeader *PacketHeader) error {
+func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader) error {
 	line, err := bufReader.ReadSlice('\n')
 	if err != nil {
 		return err
@@ -133,9 +135,9 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *PacketHeader) error
 		outPutConn, err := net.Dial("tcp", string(remoteAddr))
 		if err != nil {
 
-			finReq := generateFinReq(packetHeader.Id)
+			finReq := common.GenerateFinReq(packetHeader.Id)
 
-			sessionConn := globalSessionConn.getConn()
+			sessionConn := globalSessionConn.GetConn()
 			if sessionConn == nil {
 				// Impossible
 				return nil
@@ -149,19 +151,19 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *PacketHeader) error
 			return nil
 		}
 
-		globalOutputConns.addConn(packetHeader.Id, outPutConn)
+		globalOutputConns.AddConn(packetHeader.Id, outPutConn)
 		go readOutputAndWriteChannel(outPutConn, packetHeader.Id)
 
 	} else if string(line[:3]) == "FIN" {
 
-		outPutConn := globalOutputConns.getConn(packetHeader.Id)
+		outPutConn := globalOutputConns.GetConn(packetHeader.Id)
 
 		if outPutConn == nil {
 			return errors.New("Impossible!")
 		}
 
 		outPutConn.(*net.TCPConn).CloseWrite()
-		globalOutputConns.addDone(packetHeader.Id)
+		globalOutputConns.AddDone(packetHeader.Id)
 
 	} else {
 		return errors.New("non supported command")
@@ -170,7 +172,7 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *PacketHeader) error
 	return nil
 }
 
-func handleChannelPayload(bufReader *bufio.Reader, packetHeader *PacketHeader) error {
+func handleChannelPayload(bufReader *bufio.Reader, packetHeader *common.PacketHeader) error {
 	buf := make([]byte, 16384)
 	rn, err := bufReader.Read(buf)
 
@@ -178,8 +180,8 @@ func handleChannelPayload(bufReader *bufio.Reader, packetHeader *PacketHeader) e
 		return err
 	}
 
-	go func(packetHeader *PacketHeader, buf []byte) {
-		outputConn := globalOutputConns.getConn(packetHeader.Id)
+	go func(packetHeader *common.PacketHeader, buf []byte) {
+		outputConn := globalOutputConns.GetConn(packetHeader.Id)
 
 		if outputConn == nil {
 			return
