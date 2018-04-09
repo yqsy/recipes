@@ -10,6 +10,7 @@ import (
 
 	"github.com/yqsy/recipes/multiplexer/common"
 	"log"
+	"io"
 )
 
 var globalSessionConn common.SessionConn
@@ -28,7 +29,7 @@ func readOutputAndWriteChannel(outputConn net.Conn, id uint32) {
 		return
 	}
 
-	buf := make([]byte, 16384)
+	buf := make([]byte, 32*1024)
 	for {
 		rn, err := outputConn.Read(buf)
 
@@ -50,7 +51,6 @@ func readOutputAndWriteChannel(outputConn net.Conn, id uint32) {
 
 		// send payload to channel
 		payloadReq := common.GeneratePayload(id, buf[:rn])
-
 		wn, err := sessionConn.Write(payloadReq)
 		if wn != len(payloadReq) || err != nil {
 			globalOutputConns.AddDone(id)
@@ -191,8 +191,8 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 }
 
 func handleChannelPayload(bufReader *bufio.Reader, packetHeader *common.PacketHeader) error {
-	buf := make([]byte, 16384)
-	rn, err := bufReader.Read(buf)
+	buf := make([]byte, packetHeader.Len)
+	rn, err := io.ReadFull(bufReader, buf)
 
 	if err != nil {
 		return err

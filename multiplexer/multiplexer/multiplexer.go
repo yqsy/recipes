@@ -12,6 +12,7 @@ import (
 	"strings"
 	"log"
 	"github.com/yqsy/recipes/multiplexer/common"
+	"io"
 )
 
 var globalSessionConn common.SessionConn
@@ -58,7 +59,7 @@ func readInputAndWriteChannel(inputConn net.Conn, remoteConnectAddr string) {
 
 	log.Printf("[%v]relay: %v <-> %v(channel)\n", id, inputConn.RemoteAddr(), sessionConn.RemoteAddr())
 
-	buf := make([]byte, 16384)
+	buf := make([]byte, 32*1024)
 	for {
 		rn, err := inputConn.Read(buf)
 
@@ -66,6 +67,7 @@ func readInputAndWriteChannel(inputConn net.Conn, remoteConnectAddr string) {
 			// send FIN to channel
 			finReq := common.GenerateFinReq(id)
 			wn, err = sessionConn.Write(finReq)
+
 			if wn != len(finReq) || err != nil {
 				globalInputConns.AddDone(id)
 				log.Printf("[%v]force done: %v -> %v(channel) err: %v\n", id, inputConn.RemoteAddr(), sessionConn.RemoteAddr(), err)
@@ -79,8 +81,8 @@ func readInputAndWriteChannel(inputConn net.Conn, remoteConnectAddr string) {
 
 		// send payload to channel
 		payloadReq := common.GeneratePayload(id, buf[:rn])
-
 		wn, err = sessionConn.Write(payloadReq)
+
 		if wn != len(payloadReq) || err != nil {
 			globalInputConns.AddDone(id)
 			log.Printf("[%v]force done: %v -> %v(channel) err: %v\n", id, inputConn.RemoteAddr(), sessionConn.RemoteAddr(), err)
@@ -194,8 +196,8 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 }
 
 func handleChannelPayload(bufReader *bufio.Reader, packetHeader *common.PacketHeader) error {
-	buf := make([]byte, 16384)
-	rn, err := bufReader.Read(buf)
+	buf := make([]byte, packetHeader.Len)
+	rn, err := io.ReadFull(bufReader, buf)
 
 	if err != nil {
 		return err
