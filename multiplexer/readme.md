@@ -50,7 +50,7 @@ channel连接本身的思考:
 # 2. 流量控制
 
 * 从input或者output收数据之前判断`发送字节数`是否达到`高水位`,如果达到`等待条件变量`直至水位之下
-* 向output或者input发送数据完毕之后,判断`接受字节数`是否达到`consume位置`,如果达到`向channel`发送consume消息降低水位
+* 向output或者input发送数据完毕之后,判断`发送字节数`是否达到`consume位置`,如果达到`向channel`发送consume消息降低水位
 
 <a id="markdown-3-包头定义" name="3-包头定义"></a>
 # 3. 包头定义

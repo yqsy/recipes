@@ -51,32 +51,57 @@ func (sessionConn *SessionConn) GetConn() net.Conn {
 	return sessionConn.conn
 }
 
+// input or output connection
+type DetialConn struct {
+	conn net.Conn
+
+	// see WaitUntilDie
+	done chan struct{}
+
+	// flow control
+	readioAndSendChannelBytes uint32
+	readChannelAdnSendioBytes uint32
+}
+
+func newDetialConn(conn net.Conn) *DetialConn {
+	detialConn := &DetialConn{}
+	detialConn.conn = conn
+	detialConn.done = make(chan struct{}, 2)
+	return detialConn
+}
+
 // input or output connections
 type MultiConn struct {
-	idAndConn map[uint32]net.Conn
-	idAndDone map[uint32]chan struct{}
-	mtx       sync.Mutex
+	connMap map[uint32]*DetialConn
+	mtx     sync.Mutex
 }
 
 func NewMultiConn() *MultiConn {
 	multiConn := &MultiConn{}
-	multiConn.idAndConn = make(map[uint32]net.Conn)
-	multiConn.idAndDone = make(map[uint32]chan struct{})
+	multiConn.connMap = make(map[uint32]*DetialConn)
 	return multiConn
 }
 
 func (multiConn *MultiConn) AddConn(id uint32, conn net.Conn) {
 	multiConn.mtx.Lock()
 	defer multiConn.mtx.Unlock()
-	multiConn.idAndConn[id] = conn
-	multiConn.idAndDone[id] = make(chan struct{}, 2)
+	multiConn.connMap[id] = newDetialConn(conn)
 }
 
 func (multiConn *MultiConn) GetConn(id uint32) net.Conn {
 	multiConn.mtx.Lock()
 	defer multiConn.mtx.Unlock()
-	if conn, ok := multiConn.idAndConn[id]; ok {
-		return conn
+	if detialConn, ok := multiConn.connMap[id]; ok {
+		return detialConn.conn
+	}
+	return nil
+}
+
+func (multiConn *MultiConn) getDone(id uint32) chan struct{} {
+	multiConn.mtx.Lock()
+	defer multiConn.mtx.Unlock()
+	if detialConn, ok := multiConn.connMap[id]; ok {
+		return detialConn.done
 	}
 	return nil
 }
@@ -84,15 +109,14 @@ func (multiConn *MultiConn) GetConn(id uint32) net.Conn {
 func (multiConn *MultiConn) DelConn(id uint32) {
 	multiConn.mtx.Lock()
 	defer multiConn.mtx.Unlock()
-	delete(multiConn.idAndConn, id)
-	delete(multiConn.idAndDone, id)
+	delete(multiConn.connMap, id)
 }
 
 func (multiConn *MultiConn) AddDone(id uint32) {
 	multiConn.mtx.Lock()
 	defer multiConn.mtx.Unlock()
-	if done, ok := multiConn.idAndDone[id]; ok {
-		done <- struct{}{}
+	if detialConn, ok := multiConn.connMap[id]; ok {
+		detialConn.done <- struct{}{}
 	}
 }
 
@@ -100,9 +124,10 @@ func (multiConn *MultiConn) AddDone(id uint32) {
 // input <== channel <== output  half close
 // close socket
 func (multiConn *MultiConn) WaitUntilDie(id uint32) {
-	multiConn.mtx.Lock()
-	var done = multiConn.idAndDone[id]
-	multiConn.mtx.Unlock()
+	done := multiConn.getDone(id)
+	if done == nil {
+		return
+	}
 	for i := 0; i < 2; i++ {
 		<-done
 	}
@@ -115,19 +140,15 @@ func (multiConn *MultiConn) ShutWriteAllConns(channelConn net.Conn, multiplexer 
 	multiConn.mtx.Lock()
 	defer multiConn.mtx.Unlock()
 
-	for id, conn := range multiConn.idAndConn {
-		conn.(*net.TCPConn).CloseWrite()
-		if done, ok := multiConn.idAndDone[id]; ok {
-			done <- struct{}{}
-			if multiplexer {
-				log.Printf("[%v]session force done: %v <- %v(channel)", id, conn.RemoteAddr(), channelConn.RemoteAddr())
-			} else {
-				log.Printf("[%v]session force done: (channel)%v -> %v", id, conn.LocalAddr(), conn.RemoteAddr())
-			}
-
+	for id, detialConn := range multiConn.connMap {
+		detialConn.conn.(*net.TCPConn).CloseWrite()
+		detialConn.done <- struct{}{}
+		if multiplexer {
+			log.Printf("[%v]session force done: %v <- %v(channel)", id, detialConn.conn.RemoteAddr(), channelConn.RemoteAddr())
 		} else {
-			panic("impossible")
+			log.Printf("[%v]session force done: (channel)%v -> %v", id, detialConn.conn.LocalAddr(), detialConn.conn.RemoteAddr())
 		}
+
 	}
 }
 
