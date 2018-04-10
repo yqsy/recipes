@@ -25,13 +25,17 @@
 * [tcprelay](tcprelay/readme.md)
 * [netcat](netcat/readme.md)
 * [multiplexer(N:1 and 1:n)](multiplexer/readme.md)
-* [through-net](through-net/readme.md)
+* [through-net(中继内网穿透)](through-net/readme.md)
+* [slowrecv(慢速收)](slowrecv/readme.md)
 
 <a id="markdown-22-echo-类型" name="22-echo-类型"></a>
 ## 2.2. echo 类型
 
+* [echo](echo)
+* [discard](discard)
 * [ttcp](ttcp/readme.md)
-* [simplehttp](simplehttp/simplehttp.go)
+* [simplehttp](simplehttp)
+
 
 <a id="markdown-23-其他" name="23-其他"></a>
 ## 2.3. 其他
