@@ -141,6 +141,40 @@ func readChannelAndWriteInput(remoteAddr string) {
 	}
 }
 
+func waitForChannelAndWriteInPut(detialConn *common.DetialConn, id uint32) {
+	sessionConn := globalSessionConn.GetConn()
+	if sessionConn == nil {
+		// Impossible
+		return
+	}
+
+	for {
+		msg := <-detialConn.SendioQueue
+
+		if msg == nil {
+			break
+		}
+
+		wn, err := detialConn.Conn.Write(msg.Bytes)
+		if err != nil || wn != len(msg.Bytes) {
+			break
+		}
+
+		detialConn.ReadChannelAndSendioBytes += uint32(len(msg.Bytes))
+
+		if detialConn.ReadChannelAndSendioBytes > common.ConsumeMark {
+			ackReq := common.GenerateAckReq(id, detialConn.ReadChannelAndSendioBytes)
+
+			wn, err := sessionConn.Write(ackReq)
+			if wn != len(ackReq) || err != nil {
+				break
+			}
+
+			detialConn.ReadChannelAndSendioBytes = 0
+		}
+	}
+}
+
 func readChannelAndWriteInputDetial(sessionConn net.Conn) error {
 	defer sessionConn.Close()
 
@@ -195,7 +229,7 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 
 		detialConn.Conn.(*net.TCPConn).CloseWrite()
 		globalInputConns.AddDone(packetHeader.Id)
-
+		close(detialConn.SendioQueue)
 		log.Printf("[%v]done: %v <- %v(channel)\n", packetHeader.Id, detialConn.Conn.RemoteAddr(), sessionConn.RemoteAddr())
 
 		// FIN ok!
@@ -235,19 +269,15 @@ func handleChannelPayload(bufReader *bufio.Reader, packetHeader *common.PacketHe
 		return err
 	}
 
-	go func(packetHeader *common.PacketHeader, buf []byte) {
-		detialConn := globalInputConns.GetDetialConn(packetHeader.Id)
+	detialConn := globalInputConns.GetDetialConn(packetHeader.Id)
 
-		if detialConn == nil {
-			return
-		}
+	if detialConn == nil {
+		return nil
+	}
 
-		wn, err := detialConn.Conn.Write(buf)
-		if err != nil || wn != len(buf) {
-			return
-		}
-
-	}(packetHeader, buf[:rn])
+	msg := &common.Msg{}
+	msg.Bytes = buf[:rn]
+	detialConn.SendioQueue <- msg
 
 	return nil
 }

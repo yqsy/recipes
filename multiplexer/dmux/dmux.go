@@ -11,6 +11,7 @@ import (
 	"github.com/yqsy/recipes/multiplexer/common"
 	"log"
 	"io"
+	"strconv"
 )
 
 var globalSessionConn common.SessionConn
@@ -29,8 +30,15 @@ func readOutputAndWriteChannel(outputConn net.Conn, id uint32) {
 		return
 	}
 
+	detialConn := globalOutputConns.GetDetialConn(id)
+	if detialConn == nil {
+		panic("err")
+	}
+
 	buf := make([]byte, 32*1024)
 	for {
+		detialConn.ReadioAndSendChannelControl.WaitCanBeRead()
+
 		rn, err := outputConn.Read(buf)
 
 		if err != nil {
@@ -57,6 +65,8 @@ func readOutputAndWriteChannel(outputConn net.Conn, id uint32) {
 			log.Printf("[%v]force done: (channel)%v <- %v err: %v\n", id, outputConn.LocalAddr(), outputConn.RemoteAddr(), err)
 			break
 		}
+
+		detialConn.ReadioAndSendChannelControl.UpWater(uint32(wn))
 	}
 
 	globalOutputConns.WaitUntilDie(id)
@@ -171,6 +181,10 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 
 	line = line[:len(line)-2]
 
+	if len(line) < 3 {
+		return errors.New("command too short")
+	}
+
 	if string(line[:3]) == "SYN" {
 		if len(line) < 5 {
 			return errors.New("command too short")
@@ -225,6 +239,28 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 
 		log.Printf("[%v]done: (channel)%v -> %v\n", packetHeader.Id, detialConn.Conn.LocalAddr(), detialConn.Conn.RemoteAddr())
 
+	} else if string(line[:3]) == "ACK" {
+		detialConn := globalOutputConns.GetDetialConn(packetHeader.Id)
+
+		if detialConn == nil {
+			return errors.New("Impossible!")
+		}
+
+		if len(line) < 5 {
+			return errors.New("command too short")
+		}
+
+		ackBytesStr := string(line[4:])
+		ackBytes, err := strconv.Atoi(ackBytesStr)
+
+		if err != nil {
+			return errors.New("err ack bytes")
+		}
+
+		detialConn.ReadioAndSendChannelControl.DownWater(uint32(ackBytes))
+
+		// ACK ok!
+		return nil
 	} else {
 		return errors.New("non supported command")
 	}
