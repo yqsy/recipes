@@ -88,6 +88,41 @@ func readChannelAndWriteOutput(listenAddr string) {
 	}
 }
 
+func waitForChannelAndWriteOutput(detialConn *common.DetialConn, id uint32) {
+
+	sessionConn := globalSessionConn.GetConn()
+	if sessionConn == nil {
+		// Impossible
+		return
+	}
+
+	for {
+		msg := <-detialConn.SendioQueue
+
+		if msg == nil {
+			break
+		}
+
+		wn, err := detialConn.Conn.Write(msg.Bytes)
+		if err != nil || wn != len(msg.Bytes) {
+			break
+		}
+
+		detialConn.ReadChannelAndSendioBytes += uint32(len(msg.Bytes))
+
+		if detialConn.ReadChannelAndSendioBytes > common.ConsumeMark {
+			ackReq := common.GenerateAckReq(id, detialConn.ReadChannelAndSendioBytes)
+
+			wn, err := sessionConn.Write(ackReq)
+			if wn != len(ackReq) || err != nil {
+				break
+			}
+
+			detialConn.ReadChannelAndSendioBytes = 0
+		}
+	}
+}
+
 func readChannelAndWriteOutputDetial(sessionConn net.Conn) error {
 	defer sessionConn.Close()
 
@@ -163,25 +198,32 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 
 		globalOutputConns.AddConn(packetHeader.Id, outputConn)
 
+		detialConn := globalOutputConns.GetDetialConn(packetHeader.Id)
+		if detialConn == nil {
+			panic("err")
+		}
+
 		log.Printf("[%v]relay: (channel)%v <-> %v\n", packetHeader.Id, outputConn.LocalAddr(), outputConn.RemoteAddr())
 
 		go readOutputAndWriteChannel(outputConn, packetHeader.Id)
+		go waitForChannelAndWriteOutput(detialConn, packetHeader.Id)
 
 	} else if string(line[:3]) == "FIN" {
 
-		outPutConn := globalOutputConns.GetConn(packetHeader.Id)
+		detialConn := globalOutputConns.GetDetialConn(packetHeader.Id)
 
-		if outPutConn == nil {
+		if detialConn == nil {
 			// may be output not connected
 
 			log.Printf("not find %v\n", packetHeader.Id)
 			return nil
 		}
 
-		outPutConn.(*net.TCPConn).CloseWrite()
+		detialConn.Conn.(*net.TCPConn).CloseWrite()
 		globalOutputConns.AddDone(packetHeader.Id)
+		close(detialConn.SendioQueue)
 
-		log.Printf("[%v]done: (channel)%v -> %v\n", packetHeader.Id, outPutConn.LocalAddr(), outPutConn.RemoteAddr())
+		log.Printf("[%v]done: (channel)%v -> %v\n", packetHeader.Id, detialConn.Conn.LocalAddr(), detialConn.Conn.RemoteAddr())
 
 	} else {
 		return errors.New("non supported command")
@@ -198,20 +240,15 @@ func handleChannelPayload(bufReader *bufio.Reader, packetHeader *common.PacketHe
 		return err
 	}
 
-	go func(packetHeader *common.PacketHeader, buf []byte) {
-		outputConn := globalOutputConns.GetConn(packetHeader.Id)
+	detialConn := globalOutputConns.GetDetialConn(packetHeader.Id)
 
-		if outputConn == nil {
-			return
-		}
+	if detialConn == nil {
+		return nil
+	}
 
-		wn, err := outputConn.Write(buf)
-		if err != nil || wn != len(buf) {
-			return
-		}
-
-	}(packetHeader, buf[:rn])
-
+	msg := &common.Msg{}
+	msg.Bytes = buf[:rn]
+	detialConn.SendioQueue <- msg
 	return nil
 }
 

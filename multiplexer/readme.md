@@ -64,7 +64,7 @@ channel连接本身的思考:
 command
 * SYN ip:port\r\n
 * FIN\r\n
-
+* ACK xxx\r\n // xxx is bytes num
 
 <a id="markdown-4-单元测试" name="4-单元测试"></a>
 # 4. 单元测试

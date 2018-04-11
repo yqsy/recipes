@@ -13,6 +13,7 @@ import (
 	"log"
 	"github.com/yqsy/recipes/multiplexer/common"
 	"io"
+	"strconv"
 )
 
 var globalSessionConn common.SessionConn
@@ -50,6 +51,11 @@ func readInputAndWriteChannel(inputConn net.Conn, remoteConnectAddr string) {
 		log.Printf("freeid:%v reminder: %v\n", id, globalIdGen.GetFreeIdNum())
 	}()
 
+	detialConn := globalInputConns.GetDetialConn(id)
+	if detialConn == nil {
+		panic("err")
+	}
+
 	// send SYN to channel
 	synReq := generateSynReq(id, remoteConnectAddr)
 	wn, err := sessionConn.Write(synReq)
@@ -61,6 +67,8 @@ func readInputAndWriteChannel(inputConn net.Conn, remoteConnectAddr string) {
 
 	buf := make([]byte, 32*1024)
 	for {
+		detialConn.ReadioAndSendChannelControl.WaitCanBeRead()
+
 		rn, err := inputConn.Read(buf)
 
 		if err != nil {
@@ -88,6 +96,8 @@ func readInputAndWriteChannel(inputConn net.Conn, remoteConnectAddr string) {
 			log.Printf("[%v]force done: %v -> %v(channel) err: %v\n", id, inputConn.RemoteAddr(), sessionConn.RemoteAddr(), err)
 			break
 		}
+
+		detialConn.ReadioAndSendChannelControl.UpWater(uint32(wn))
 	}
 
 	globalInputConns.WaitUntilDie(id)
@@ -177,18 +187,40 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 	line = line[:len(line)-2]
 
 	if string(line) == "FIN" {
-		inputConn := globalInputConns.GetConn(packetHeader.Id)
+		detialConn := globalInputConns.GetDetialConn(packetHeader.Id)
 
-		if inputConn == nil {
+		if detialConn == nil {
 			return errors.New("Impossible!")
 		}
 
-		inputConn.(*net.TCPConn).CloseWrite()
+		detialConn.Conn.(*net.TCPConn).CloseWrite()
 		globalInputConns.AddDone(packetHeader.Id)
 
-		log.Printf("[%v]done: %v <- %v(channel)\n", packetHeader.Id, inputConn.RemoteAddr(), sessionConn.RemoteAddr())
+		log.Printf("[%v]done: %v <- %v(channel)\n", packetHeader.Id, detialConn.Conn.RemoteAddr(), sessionConn.RemoteAddr())
 
 		// FIN ok!
+		return nil
+	} else if string(line) == "ACK" {
+		detialConn := globalInputConns.GetDetialConn(packetHeader.Id)
+
+		if detialConn == nil {
+			return errors.New("Impossible!")
+		}
+
+		if len(line) < 5 {
+			return errors.New("command too short")
+		}
+
+		ackBytesStr := string(line[4:])
+		ackBytes, err := strconv.Atoi(ackBytesStr)
+
+		if err != nil {
+			return errors.New("err ack bytes")
+		}
+
+		detialConn.ReadioAndSendChannelControl.DownWater(uint32(ackBytes))
+
+		// ACK ok!
 		return nil
 	} else {
 		return errors.New("only support FIN command")
@@ -204,13 +236,13 @@ func handleChannelPayload(bufReader *bufio.Reader, packetHeader *common.PacketHe
 	}
 
 	go func(packetHeader *common.PacketHeader, buf []byte) {
-		inputConn := globalInputConns.GetConn(packetHeader.Id)
+		detialConn := globalInputConns.GetDetialConn(packetHeader.Id)
 
-		if inputConn == nil {
+		if detialConn == nil {
 			return
 		}
 
-		wn, err := inputConn.Write(buf)
+		wn, err := detialConn.Conn.Write(buf)
 		if err != nil || wn != len(buf) {
 			return
 		}

@@ -7,6 +7,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"log"
+	"fmt"
+)
+
+const (
+	highWaterMark = 32 * 1024 * 64
+	ConsumeMark   = uint32(highWaterMark * (2 / 3))
 )
 
 func PanicOnError(err error) {
@@ -51,22 +57,63 @@ func (sessionConn *SessionConn) GetConn() net.Conn {
 	return sessionConn.conn
 }
 
+type WaterMarkControl struct {
+	n    uint32
+	mtx  sync.Mutex
+	cond sync.Cond
+}
+
+func (wc *WaterMarkControl) UpWater(n uint32) {
+	wc.mtx.Lock()
+	defer wc.mtx.Unlock()
+	wc.n += n
+}
+
+func (wc *WaterMarkControl) WaitCanBeRead() {
+	wc.mtx.Lock()
+	if wc.n > highWaterMark {
+		wc.cond.Wait()
+	}
+	wc.mtx.Unlock()
+}
+
+func (wc *WaterMarkControl) DownWater(n uint32) {
+	wc.mtx.Lock()
+	defer wc.mtx.Unlock()
+	wc.n -= n
+	wc.cond.Signal()
+}
+
+func (wc *WaterMarkControl) Dry() {
+	wc.mtx.Lock()
+	defer wc.mtx.Unlock()
+	wc.n = 0
+	wc.cond.Signal()
+}
+
+type Msg struct {
+	Bytes []byte
+}
+
 // input or output connection
 type DetialConn struct {
-	conn net.Conn
+	Conn net.Conn
 
 	// see WaitUntilDie
-	done chan struct{}
+	Done chan struct{}
 
-	// flow control
-	readioAndSendChannelBytes uint32
-	readChannelAdnSendioBytes uint32
+	// flow control  (io means input or output)
+	ReadioAndSendChannelControl WaterMarkControl
+
+	ReadChannelAndSendioBytes uint32
+
+	SendioQueue chan *Msg
 }
 
 func newDetialConn(conn net.Conn) *DetialConn {
 	detialConn := &DetialConn{}
-	detialConn.conn = conn
-	detialConn.done = make(chan struct{}, 2)
+	detialConn.Conn = conn
+	detialConn.Done = make(chan struct{}, 2)
 	return detialConn
 }
 
@@ -88,11 +135,11 @@ func (multiConn *MultiConn) AddConn(id uint32, conn net.Conn) {
 	multiConn.connMap[id] = newDetialConn(conn)
 }
 
-func (multiConn *MultiConn) GetConn(id uint32) net.Conn {
+func (multiConn *MultiConn) GetDetialConn(id uint32) *DetialConn {
 	multiConn.mtx.Lock()
 	defer multiConn.mtx.Unlock()
 	if detialConn, ok := multiConn.connMap[id]; ok {
-		return detialConn.conn
+		return detialConn
 	}
 	return nil
 }
@@ -101,7 +148,7 @@ func (multiConn *MultiConn) getDone(id uint32) chan struct{} {
 	multiConn.mtx.Lock()
 	defer multiConn.mtx.Unlock()
 	if detialConn, ok := multiConn.connMap[id]; ok {
-		return detialConn.done
+		return detialConn.Done
 	}
 	return nil
 }
@@ -116,7 +163,7 @@ func (multiConn *MultiConn) AddDone(id uint32) {
 	multiConn.mtx.Lock()
 	defer multiConn.mtx.Unlock()
 	if detialConn, ok := multiConn.connMap[id]; ok {
-		detialConn.done <- struct{}{}
+		detialConn.Done <- struct{}{}
 	}
 }
 
@@ -141,12 +188,14 @@ func (multiConn *MultiConn) ShutWriteAllConns(channelConn net.Conn, multiplexer 
 	defer multiConn.mtx.Unlock()
 
 	for id, detialConn := range multiConn.connMap {
-		detialConn.conn.(*net.TCPConn).CloseWrite()
-		detialConn.done <- struct{}{}
+		detialConn.Conn.(*net.TCPConn).CloseWrite()
+		detialConn.Done <- struct{}{}
+		detialConn.ReadioAndSendChannelControl.Dry()
+		close(detialConn.SendioQueue)
 		if multiplexer {
-			log.Printf("[%v]session force done: %v <- %v(channel)", id, detialConn.conn.RemoteAddr(), channelConn.RemoteAddr())
+			log.Printf("[%v]session force Done: %v <- %v(channel)", id, detialConn.Conn.RemoteAddr(), channelConn.RemoteAddr())
 		} else {
-			log.Printf("[%v]session force done: (channel)%v -> %v", id, detialConn.conn.LocalAddr(), detialConn.conn.RemoteAddr())
+			log.Printf("[%v]session force Done: (channel)%v -> %v", id, detialConn.Conn.LocalAddr(), detialConn.Conn.RemoteAddr())
 		}
 
 	}
@@ -212,5 +261,19 @@ func GeneratePayload(id uint32, payload []byte) []byte {
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.BigEndian, &packetHeader)
 	buf.Write(payload)
+	return buf.Bytes()
+}
+
+func GenerateAckReq(id uint32, ackBytes uint32) []byte {
+	cmd := fmt.Sprintf("ACK %v \r\n", ackBytes)
+
+	var packetHeader PacketHeader
+	packetHeader.Len = uint32(len(cmd))
+	packetHeader.Id = id
+	packetHeader.Cmd = true
+
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, &packetHeader)
+	buf.WriteString(cmd)
 	return buf.Bytes()
 }
