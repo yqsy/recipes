@@ -65,6 +65,8 @@ func readInputAndWriteChannel(inputConn net.Conn, remoteConnectAddr string) {
 
 	log.Printf("[%v]relay: %v <-> %v(channel)\n", id, inputConn.RemoteAddr(), sessionConn.RemoteAddr())
 
+	go waitForChannelAndWriteInPut(detialConn, id)
+
 	buf := make([]byte, 32*1024)
 	for {
 		detialConn.ReadioAndSendChannelControl.WaitCanBeRead()
