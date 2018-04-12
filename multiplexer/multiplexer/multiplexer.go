@@ -146,8 +146,7 @@ func readChannelAndWriteInput(remoteAddr string) {
 func waitForChannelAndWriteInPut(detialConn *common.DetialConn, id uint32) {
 	sessionConn := globalSessionConn.GetConn()
 	if sessionConn == nil {
-		// Impossible
-		return
+		panic("err")
 	}
 
 	for {
@@ -222,11 +221,15 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 
 	line = line[:len(line)-2]
 
-	if string(line) == "FIN" {
+	if len(line) < 3 {
+		return errors.New("command too short")
+	}
+
+	if string(line[:3]) == "FIN" {
 		detialConn := globalInputConns.GetDetialConn(packetHeader.Id)
 
 		if detialConn == nil {
-			return errors.New("Impossible!")
+			panic("err")
 		}
 
 		detialConn.Conn.(*net.TCPConn).CloseWrite()
@@ -236,11 +239,11 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 
 		// FIN ok!
 		return nil
-	} else if string(line) == "ACK" {
+	} else if string(line[:3]) == "ACK" {
 		detialConn := globalInputConns.GetDetialConn(packetHeader.Id)
 
 		if detialConn == nil {
-			return errors.New("Impossible!")
+			panic("err")
 		}
 
 		if len(line) < 5 {

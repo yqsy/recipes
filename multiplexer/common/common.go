@@ -60,7 +60,13 @@ func (sessionConn *SessionConn) GetConn() net.Conn {
 type WaterMarkControl struct {
 	n    uint32
 	mtx  sync.Mutex
-	cond sync.Cond
+	cond *sync.Cond
+}
+
+func newWaterMarkControl() *WaterMarkControl {
+	wc := &WaterMarkControl{}
+	wc.cond = sync.NewCond(&wc.mtx)
+	return wc
 }
 
 func (wc *WaterMarkControl) UpWater(n uint32) {
@@ -103,7 +109,7 @@ type DetialConn struct {
 	Done chan struct{}
 
 	// flow control  (io means input or output)
-	ReadioAndSendChannelControl WaterMarkControl
+	ReadioAndSendChannelControl *WaterMarkControl
 
 	ReadChannelAndSendioBytes uint32
 
@@ -114,6 +120,8 @@ func newDetialConn(conn net.Conn) *DetialConn {
 	detialConn := &DetialConn{}
 	detialConn.Conn = conn
 	detialConn.Done = make(chan struct{}, 2)
+	detialConn.SendioQueue = make(chan *Msg)
+	detialConn.ReadioAndSendChannelControl = newWaterMarkControl()
 	return detialConn
 }
 
@@ -265,7 +273,7 @@ func GeneratePayload(id uint32, payload []byte) []byte {
 }
 
 func GenerateAckReq(id uint32, ackBytes uint32) []byte {
-	cmd := fmt.Sprintf("ACK %v \r\n", ackBytes)
+	cmd := fmt.Sprintf("ACK %v\r\n", ackBytes)
 
 	var packetHeader PacketHeader
 	packetHeader.Len = uint32(len(cmd))

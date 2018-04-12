@@ -26,8 +26,7 @@ func readOutputAndWriteChannel(outputConn net.Conn, id uint32) {
 
 	sessionConn := globalSessionConn.GetConn()
 	if sessionConn == nil {
-		// Impossible
-		return
+		panic("err")
 	}
 
 	detialConn := globalOutputConns.GetDetialConn(id)
@@ -102,8 +101,7 @@ func waitForChannelAndWriteOutput(detialConn *common.DetialConn, id uint32) {
 
 	sessionConn := globalSessionConn.GetConn()
 	if sessionConn == nil {
-		// Impossible
-		return
+		panic("err")
 	}
 
 	for {
@@ -198,8 +196,7 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 
 			sessionConn := globalSessionConn.GetConn()
 			if sessionConn == nil {
-				// Impossible
-				return nil
+				panic("err")
 			}
 
 			wn, err := sessionConn.Write(finReq)
@@ -243,7 +240,7 @@ func handleChannelCmd(bufReader *bufio.Reader, packetHeader *common.PacketHeader
 		detialConn := globalOutputConns.GetDetialConn(packetHeader.Id)
 
 		if detialConn == nil {
-			return errors.New("Impossible!")
+			panic("err")
 		}
 
 		if len(line) < 5 {
