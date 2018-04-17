@@ -96,13 +96,20 @@ channel连接本身的思考:
 * len 4 byte
 * id 4 byte
 * cmd 1 byte (bool)
-* if cmd == true, command\r\n
+* if cmd == true, command
 
 ---
-command
-* SYN ip:port\r\n
-* FIN\r\n
-* ACK xxx\r\n // xxx is bytes num
+
+建立channel握手:
+* CONNECT ip:port
+* CONNECT OK
+* BIND ip:port
+* BIND OK
+---
+
+其他:
+* FIN
+* ACK xxx // xxx is bytes num
 
 <a id="markdown-3-单元测试" name="3-单元测试"></a>
 # 3. 单元测试
