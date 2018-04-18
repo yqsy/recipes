@@ -17,11 +17,78 @@ var usage = `Usage:
 -L: local listen and connect to remote in channel
 -R: remote listen and connect to local in channel`
 
-func serveLocal(context *common.Context) {
+func serveSession(context *common.Context, session *common.Session) {
+	defer session.Conn.Close()
+
+	var err error
+	session.Id, err = context.IdGen.GetFreeId()
+	if err != nil {
+		return
+	}
+	defer func() {
+		context.IdGen.ReleaseId(session.Id)
+		log.Printf("release id: %v", session.Id)
+	}()
+
+	context.ConnectSessionDict.Append(session.Id, session)
+	defer context.ConnectSessionDict.Del(session.Id)
+
+	// 维护session <-(阻塞blockqueue) multiplexer
+	go func(context *common.Context, session *common.Session) {
+		for {
+			val := session.SendQueue.Take()
+
+			if val == nil {
+				break
+			}
+
+			msg := val.(*common.Msg)
+
+			wn, err := session.Conn.Write(msg.Data)
+			if err != nil || wn != len(msg.Data) {
+				break
+			}
+		}
+
+		session.Conn.(*net.TCPConn).CloseWrite()
+		session.CloseChannel <- struct{}{}
+		log.Printf("[%v]%v <- multiplexer done", session.Id, session.Conn.RemoteAddr())
+	}(context, session)
+
+	buf := make([]byte, 16*1024*1024)
+	// session (阻塞read)-> multiplexer 投递到blockqueue中
+	for {
+		rn, err := session.Conn.Read(buf)
+
+		if err != nil {
+			break
+		}
+
+		msg := common.NewMsg(session.Id, buf[rn:])
+
+		context.SendQueue.Put(&msg)
+	}
+
+	session.CloseChannel <- struct{}{}
+	log.Printf("[%v]%v -> multiplexer done", session.Id, session.Conn.RemoteAddr())
 
 }
 
-func serverChannel(context *common.Context) {
+func serveLocalListener(context *common.Context) {
+	for {
+		conn, err := context.MultiplexerLocalListener.Accept()
+
+		// TODO: 因为channel的关闭会导致listener的关闭,所以我暂时没做描述符满的操作(怎么区别两种关闭?)
+		if err != nil {
+			break
+		}
+
+		session := common.NewSession(conn)
+		go serveSession(context, session)
+	}
+}
+
+func serveChannel(context *common.Context) {
 
 }
 
@@ -31,50 +98,42 @@ func doLocalWay(arg []string) {
 	remoteConnectAddr := pair[2] + ":" + pair[3]
 	dmuxAddr := arg[3]
 
-	localListener, err := net.Listen("tcp", localListenAddr)
-	defer localListener.Close()
-
-	if err != nil {
-		panic(err)
-	}
-
 	for {
 		conn, err := net.Dial("tcp", dmuxAddr)
 
 		if err != nil {
-			log.Printf("connect error %v", dmuxAddr)
+			log.Printf("dial error %v", dmuxAddr)
 			time.Sleep(time.Second * 3)
 			continue
 		}
 
-		log.Printf("connect ok")
-
-		connectSynPack := common.NewConnectSynPack()
-
+		connectSynPack := common.NewConnectSynPack(remoteConnectAddr)
 		wn, err := conn.Write(connectSynPack)
 		if err != nil || wn != len(connectSynPack) {
-			log.Printf("send SYN error")
+			log.Printf("CONNECT error")
 			continue
 		}
 
 		cmd, err := common.ReadCmdLine(conn)
+		if err != nil || !cmd.IsConnectOK() {
+			log.Printf("CONNECT error")
+			continue
+		}
 
+		log.Printf("CONNECT ok %v", dmuxAddr)
+
+		context := common.NewContext(common.Connect, conn)
+		context.MultiplexerLocalListener, err = net.Listen("tcp", localListenAddr)
 		if err != nil {
-			log.Printf("recv err: %v")
-			continue
+			panic(err)
 		}
 
-		if !cmd.IsConnectOK() {
-			log.Printf("connect error")
-			continue
-		}
+		go serveLocalListener(context)
 
-		context := common.NewContext(common.Connect)
-		context.Channel = conn
+		serveChannel(context)
 
-		go serveLocal(context)
-
-		serverChannel(context)
+		// 在这里关闭,保证重启channel时能listen成功
+		context.MultiplexerLocalListener.Close()
 	}
 }
 

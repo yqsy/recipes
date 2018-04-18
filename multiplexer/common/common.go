@@ -9,20 +9,61 @@ import (
 	"bufio"
 	"errors"
 	"io"
+	"fmt"
 )
 
 const (
-	// 最多让对方每个remoteSession缓存2MiB
+	// 最多让对方每个Session缓存2MiB
 	HighWaterMask = 2 * 1024 * 1024
 
 	// 转发了75%后发送ACK让对方下降水位,继续发送
 	ResumeWaterMask = HighWaterMask * 0.75
+
+	MaxId = 65536
 )
 
 const (
 	// 包头的Len最多允许4Mib
 	MaxPackLen = 4 * 1024 * 1024
 )
+
+type IdGen struct {
+	ids []uint32
+	mtx sync.Mutex
+}
+
+func (idGen *IdGen) InitWithMaxId(maxId uint32) {
+	idGen.mtx.Lock()
+	defer idGen.mtx.Unlock()
+	for i := uint32(0); i < maxId; i++ {
+		idGen.ids = append(idGen.ids, i)
+	}
+}
+
+func (idGen *IdGen) GetFreeId() (uint32, error) {
+	idGen.mtx.Lock()
+	defer idGen.mtx.Unlock()
+
+	if len(idGen.ids) < 1 {
+		return 0, errors.New("no enough ids")
+	}
+
+	freeId := idGen.ids[0]
+	idGen.ids = idGen.ids[1:]
+	return freeId, nil
+}
+
+func (idGen *IdGen) ReleaseId(freeId uint32) {
+	idGen.mtx.Lock()
+	defer idGen.mtx.Unlock()
+	idGen.ids = append(idGen.ids, freeId)
+}
+
+func (idGen *IdGen) GetFreeIdNum() int {
+	idGen.mtx.Lock()
+	defer idGen.mtx.Unlock()
+	return len(idGen.ids)
+}
 
 type SendWaterMask struct {
 	waterMask uint32
@@ -51,27 +92,36 @@ func (waterMask *SendWaterMask) WaitUntilCanBeWrite() {
 	waterMask.mtx.Unlock()
 }
 
-type RemoteSession struct {
-	// 读remotesession阻塞read
+type Session struct {
+	// 读session阻塞read
 	// 注意读之前要判断发送水位,水位太高需要等待条件变量
-	Session net.Conn
+	Conn net.Conn
 
 	// 发送水位(向channel发送的水位)
-	sendWaterMask *SendWaterMask
+	SendWaterMask *SendWaterMask
 
-	// 写remoteSession阻塞等待blockqueue
+	// 写Session阻塞等待blockqueue
 	// 写成功后累加接收水位,累加水位到达一定高度时发送ack给channel
 	SendQueue *blockqueue.BlockQueue
 
 	// 接收水位(成功消费掉水位后,向channel发送ack,让对方继续发送数据)
-	recvWaterMask uint32
+	RecvWaterMask uint32
+
+	// 正确关闭方法:
+	// session <=== half close
+	// session ===> half close
+	CloseChannel chan struct{}
+
+	Id uint32
 }
 
-func NewRemoteSession() *RemoteSession {
-	remoteSession := &RemoteSession{}
-	remoteSession.sendWaterMask = NewSendWaterMask()
-	remoteSession.SendQueue = blockqueue.NewBlockQueue()
-	return remoteSession
+func NewSession(conn net.Conn) *Session {
+	session := &Session{}
+	session.Conn = conn
+	session.SendWaterMask = NewSendWaterMask()
+	session.SendQueue = blockqueue.NewBlockQueue()
+	session.CloseChannel = make(chan struct{}, 2)
+	return session
 }
 
 const (
@@ -79,7 +129,31 @@ const (
 	Bind    = 1
 )
 
-// 作为服务端要维护多个context,有两种主要的功能1. 类似ssh -NL 2. 类似ssh -NR
+type SessionDict struct {
+	ConnectSessionDict map[uint32]*Session
+	mtx                sync.Mutex
+}
+
+func (sessionDict *SessionDict) Append(id uint32, session *Session) {
+	sessionDict.mtx.Lock()
+	defer sessionDict.mtx.Unlock()
+	sessionDict.ConnectSessionDict[id] = session
+}
+
+func (sessionDict *SessionDict) Del(id uint32) {
+	sessionDict.mtx.Lock()
+	defer sessionDict.mtx.Unlock()
+	delete(sessionDict.ConnectSessionDict, id)
+}
+
+func NewSessionDict() *SessionDict {
+	sessionDict := &SessionDict{}
+	sessionDict.ConnectSessionDict = make(map[uint32]*Session)
+	return sessionDict
+}
+
+// 1. 作为服务端要同时维护多个context
+// 2. 有两种主要的功能1. 类似ssh -NL 2. 类似ssh -NR
 type Context struct {
 	// 读channel阻塞read
 	Channel net.Conn
@@ -88,27 +162,41 @@ type Context struct {
 	SendQueue *blockqueue.BlockQueue
 
 	// [id]session
-	ConnectSessionDict map[uint32]*RemoteSession
-
-	// [id]session
-	BindSessionDict map[uint32]*RemoteSession
+	ConnectSessionDict *SessionDict
 
 	// connect or bind
 	Cmd int
+
+	// 序号生成器
+	// CONNECT时multiplexer主动生成
+	// BIND时dmux主动生成
+	IdGen IdGen
+
+	// 作为multiplexer的本地listener
+	MultiplexerLocalListener net.Listener
 }
 
-func NewContext(cmd int) *Context {
+func NewContext(cmd int, channel net.Conn) *Context {
 	context := &Context{}
+	context.Channel = channel
 	context.SendQueue = blockqueue.NewBlockQueue()
-	context.ConnectSessionDict = make(map[uint32]*RemoteSession)
-	context.BindSessionDict = make(map[uint32]*RemoteSession)
+	context.ConnectSessionDict = NewSessionDict()
 	context.Cmd = cmd
+	context.IdGen.InitWithMaxId(MaxId)
 	return context
 }
 
 // 消息队列传送数据
 type Msg struct {
-	msg []byte
+	Id   uint32
+	Data []byte
+}
+
+func NewMsg(id uint32, data []byte) *Msg{
+	msg := &Msg{}
+	msg.Id = id
+	msg.Data = data
+	return msg
 }
 
 type ChannelPack struct {
@@ -151,8 +239,8 @@ func ReadCmdLine(channelConn net.Conn) (ChannelPackBytes, error) {
 	return buf, nil
 }
 
-func NewConnectSynPack() ChannelPackBytes {
-	pack := []byte("CONNECT")
+func NewConnectSynPack(remoteConnectAddr string) ChannelPackBytes {
+	pack := []byte(fmt.Sprintf("CONNECT %v", remoteConnectAddr))
 	channelPack := &ChannelPack{}
 	channelPack.Len = uint32(len(pack))
 	channelPack.Id = 0
