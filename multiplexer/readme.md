@@ -110,6 +110,9 @@ channel连接本身的思考:
 其他:
 * FIN
 * ACK xxx // xxx is bytes num
+* SYN
+* SYN OK
+* SYN ERROR
 
 <a id="markdown-3-单元测试" name="3-单元测试"></a>
 # 3. 单元测试

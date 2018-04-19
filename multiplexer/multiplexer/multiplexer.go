@@ -8,6 +8,7 @@ import (
 	"net"
 	"log"
 	"time"
+	"encoding/binary"
 )
 
 var usage = `Usage:
@@ -33,6 +34,14 @@ func serveSession(context *common.Context, session *common.Session) {
 	context.ConnectSessionDict.Append(session.Id, session)
 	defer context.ConnectSessionDict.Del(session.Id)
 
+	// SYN
+	synMsg := common.NewMsg(session.Id, []byte("SYN"))
+	context.SendQueue.Put(&synMsg)
+	val := session.SendQueue.Take()
+	if val == nil || !val.(*common.ChannelPackBytes).IsSynOK() {
+		return
+	}
+
 	// 维护session <-(阻塞blockqueue) multiplexer
 	go func(context *common.Context, session *common.Session) {
 		for {
@@ -48,16 +57,27 @@ func serveSession(context *common.Context, session *common.Session) {
 			if err != nil || wn != len(msg.Data) {
 				break
 			}
+
+			session.RecvWaterMask += uint32(wn)
+			if session.RecvWaterMask > common.ResumeWaterMask {
+				ackPack := []byte(fmt.Sprintf("ACK %v", session.RecvWaterMask))
+				ackMsg := common.NewMsg(session.Id, ackPack)
+				context.SendQueue.Put(&ackMsg)
+				session.RecvWaterMask = 0
+			}
 		}
 
+		// half close
 		session.Conn.(*net.TCPConn).CloseWrite()
 		session.CloseChannel <- struct{}{}
 		log.Printf("[%v]%v <- multiplexer done", session.Id, session.Conn.RemoteAddr())
 	}(context, session)
 
-	buf := make([]byte, 16*1024*1024)
 	// session (阻塞read)-> multiplexer 投递到blockqueue中
 	for {
+		session.SendWaterMask.WaitUntilCanBeWrite()
+
+		buf := make([]byte, 16*1024*1024)
 		rn, err := session.Conn.Read(buf)
 
 		if err != nil {
@@ -65,13 +85,20 @@ func serveSession(context *common.Context, session *common.Session) {
 		}
 
 		msg := common.NewMsg(session.Id, buf[rn:])
-
 		context.SendQueue.Put(&msg)
+		session.SendWaterMask.RiseMask(uint32(rn))
 	}
 
+	// half close
+	finMsg := common.NewMsg(session.Id, nil)
+	context.SendQueue.Put(&finMsg)
 	session.CloseChannel <- struct{}{}
 	log.Printf("[%v]%v -> multiplexer done", session.Id, session.Conn.RemoteAddr())
 
+	// 两边都半关闭完,释放连接
+	for i := 0; i < 2; i++ {
+		<-session.CloseChannel
+	}
 }
 
 func serveLocalListener(context *common.Context) {
@@ -89,7 +116,24 @@ func serveLocalListener(context *common.Context) {
 }
 
 func serveChannel(context *common.Context) {
+	// 维护multiplexer -> channel (阻塞blockqueue)
+	go func(context *common.Context) {
 
+	}(context)
+
+	// multiplexer <-(阻塞read) channel
+
+	for {
+		channelPack := &common.ChannelPack{}
+
+		err := binary.Read(context.Channel, binary.BigEndian, &channelPack)
+
+		if err != nil {
+
+		}
+	}
+
+	context.ConnectSessionDict.FinAll()
 }
 
 func doLocalWay(arg []string) {
@@ -107,7 +151,7 @@ func doLocalWay(arg []string) {
 			continue
 		}
 
-		connectSynPack := common.NewConnectSynPack(remoteConnectAddr)
+		connectSynPack := common.NewConnectPack(remoteConnectAddr)
 		wn, err := conn.Write(connectSynPack)
 		if err != nil || wn != len(connectSynPack) {
 			log.Printf("CONNECT error")

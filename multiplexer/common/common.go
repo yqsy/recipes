@@ -6,7 +6,6 @@ import (
 	"sync"
 	"bytes"
 	"encoding/binary"
-	"bufio"
 	"errors"
 	"io"
 	"fmt"
@@ -83,6 +82,13 @@ func (waterMask *SendWaterMask) RiseMask(n uint32) {
 	waterMask.waterMask += n
 }
 
+func (waterMask *SendWaterMask) DropMask() {
+	waterMask.mtx.Lock()
+	defer waterMask.mtx.Unlock()
+	waterMask.waterMask = 0
+	waterMask.cond.Wait()
+}
+
 func (waterMask *SendWaterMask) WaitUntilCanBeWrite() {
 	waterMask.mtx.Lock()
 
@@ -146,6 +152,16 @@ func (sessionDict *SessionDict) Del(id uint32) {
 	delete(sessionDict.ConnectSessionDict, id)
 }
 
+func (sessionDict *SessionDict) FinAll() {
+	sessionDict.mtx.Lock()
+	defer sessionDict.mtx.Unlock()
+
+	for _, session := range (sessionDict.ConnectSessionDict) {
+		session.SendQueue.Put(nil)
+		session.SendWaterMask.DropMask()
+	}
+}
+
 func NewSessionDict() *SessionDict {
 	sessionDict := &SessionDict{}
 	sessionDict.ConnectSessionDict = make(map[uint32]*Session)
@@ -192,7 +208,7 @@ type Msg struct {
 	Data []byte
 }
 
-func NewMsg(id uint32, data []byte) *Msg{
+func NewMsg(id uint32, data []byte) *Msg {
 	msg := &Msg{}
 	msg.Id = id
 	msg.Data = data
@@ -215,11 +231,18 @@ func (channelPackBytes ChannelPackBytes) IsConnectOK() bool {
 	}
 }
 
+func (channelPackBytes ChannelPackBytes) IsSynOK() bool {
+	if string(channelPackBytes) == "SYN OK" {
+		return true
+	} else {
+		return false
+	}
+}
+
 func ReadCmdLine(channelConn net.Conn) (ChannelPackBytes, error) {
 	channelPack := &ChannelPack{}
 
-	bufReader := bufio.NewReader(channelConn)
-	binary.Read(bufReader, binary.BigEndian, channelPack)
+	binary.Read(channelConn, binary.BigEndian, channelPack)
 
 	if channelPack.Len > MaxPackLen {
 		return ChannelPackBytes{}, errors.New("packet too long")
@@ -230,7 +253,7 @@ func ReadCmdLine(channelConn net.Conn) (ChannelPackBytes, error) {
 	}
 
 	buf := make([]byte, channelPack.Len)
-	rn, err := io.ReadFull(bufReader, buf)
+	rn, err := io.ReadFull(channelConn, buf)
 
 	if err != nil || rn != len(buf) {
 		return ChannelPackBytes{}, errors.New("cmd error")
@@ -239,7 +262,7 @@ func ReadCmdLine(channelConn net.Conn) (ChannelPackBytes, error) {
 	return buf, nil
 }
 
-func NewConnectSynPack(remoteConnectAddr string) ChannelPackBytes {
+func NewConnectPack(remoteConnectAddr string) ChannelPackBytes {
 	pack := []byte(fmt.Sprintf("CONNECT %v", remoteConnectAddr))
 	channelPack := &ChannelPack{}
 	channelPack.Len = uint32(len(pack))
