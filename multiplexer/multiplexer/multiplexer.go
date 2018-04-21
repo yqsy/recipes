@@ -24,6 +24,7 @@ func serveSession(context *common.Context, session *common.Session) {
 	var err error
 	session.Id, err = context.IdGen.GetFreeId()
 	if err != nil {
+		log.Printf("session id not enough")
 		return
 	}
 	defer func() {
@@ -39,8 +40,11 @@ func serveSession(context *common.Context, session *common.Session) {
 	context.SendQueue.Put(&synMsg)
 	val := session.SendQueue.Take()
 	if val == nil || !val.(*common.ChannelPackBytes).IsSynOK() {
+		log.Printf("[%v]%v <-> dmux [dmux] SYN ERROR", session.Id, session.Conn.RemoteAddr())
 		return
 	}
+
+	log.Printf("[%v]%v <-> dmux relay", session.Id, session.Conn.RemoteAddr())
 
 	// 维护session <-(阻塞blockqueue) multiplexer
 	go func(context *common.Context, session *common.Session) {
@@ -70,7 +74,7 @@ func serveSession(context *common.Context, session *common.Session) {
 		// half close
 		session.Conn.(*net.TCPConn).CloseWrite()
 		session.CloseChannel <- struct{}{}
-		log.Printf("[%v]%v <- multiplexer done", session.Id, session.Conn.RemoteAddr())
+		log.Printf("[%v]%v <- dmux done", session.Id, session.Conn.RemoteAddr())
 	}(context, session)
 
 	// session (阻塞read)-> multiplexer 投递到blockqueue中
@@ -93,7 +97,7 @@ func serveSession(context *common.Context, session *common.Session) {
 	finMsg := common.NewMsg(session.Id, nil)
 	context.SendQueue.Put(&finMsg)
 	session.CloseChannel <- struct{}{}
-	log.Printf("[%v]%v -> multiplexer done", session.Id, session.Conn.RemoteAddr())
+	log.Printf("[%v]%v -> dmux done", session.Id, session.Conn.RemoteAddr())
 
 	// 两边都半关闭完,释放连接
 	for i := 0; i < 2; i++ {
@@ -122,15 +126,13 @@ func serveChannel(context *common.Context) {
 	}(context)
 
 	// multiplexer <-(阻塞read) channel
-
 	for {
 		channelPack := &common.ChannelPack{}
-
 		err := binary.Read(context.Channel, binary.BigEndian, &channelPack)
-
 		if err != nil {
-
+			break
 		}
+
 	}
 
 	context.ConnectSessionDict.FinAll()
@@ -178,6 +180,8 @@ func doLocalWay(arg []string) {
 
 		// 在这里关闭,保证重启channel时能listen成功
 		context.MultiplexerLocalListener.Close()
+
+		fmt.Printf("read EOF from dmux, close listener: %v", context.MultiplexerLocalListener.Addr())
 	}
 }
 

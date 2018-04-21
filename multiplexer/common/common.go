@@ -86,7 +86,7 @@ func (waterMask *SendWaterMask) DropMask() {
 	waterMask.mtx.Lock()
 	defer waterMask.mtx.Unlock()
 	waterMask.waterMask = 0
-	waterMask.cond.Wait()
+	waterMask.cond.Signal()
 }
 
 func (waterMask *SendWaterMask) WaitUntilCanBeWrite() {
