@@ -53,6 +53,7 @@
 <a id="markdown-24-其他" name="24-其他"></a>
 ## 2.4. 其他
 
+* [incomplete-send(tcp发送数据不完整例子)]()
 * [file-transfer(文件传输)]()
 * [connection-pool(连接池)]()
 * [identity-verification(通道身份验证)]()
