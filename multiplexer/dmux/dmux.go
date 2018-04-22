@@ -29,9 +29,10 @@ func serverSession(context *common.Context, session *common.Session) {
 					break
 				} else if recvPack.Body.IsAck() {
 					ackBytes, err := recvPack.Body.GetAckBytes()
-					if err != nil {
+					if err == nil {
 						session.SendWaterMask.DropMask(ackBytes)
 					}
+					continue
 				}
 			}
 
@@ -65,7 +66,7 @@ func serverSession(context *common.Context, session *common.Session) {
 			break
 		}
 
-		payloadPack := common.NewPayloadPack(session.Id, buf[rn:])
+		payloadPack := common.NewPayloadPack(session.Id, buf[:rn])
 		context.SendQueue.Put(payloadPack)
 		session.SendWaterMask.RiseMask(uint32(rn))
 	}
@@ -119,10 +120,10 @@ func serverChannelConnect(context *common.Context) {
 			conn, err := net.Dial("tcp", context.DmuxConnectAddr)
 			if err != nil {
 				log.Printf("dial error %v", err)
-				synAckPack := common.NewSynAckPack(false).Serialize()
+				synAckPack := common.NewSynAckPack(channelPack.Head.Id, false).Serialize()
 				context.ChannelConn.Write(synAckPack)
 			} else {
-				synAckPack := common.NewSynAckPack(true).Serialize()
+				synAckPack := common.NewSynAckPack(channelPack.Head.Id, true).Serialize()
 				context.ChannelConn.Write(synAckPack)
 
 				session := common.NewSession(conn)
@@ -130,10 +131,10 @@ func serverChannelConnect(context *common.Context) {
 				context.ConnectSessionDict.Append(session)
 				go serverSession(context, session)
 			}
+		} else {
+			session := context.ConnectSessionDict.Find(channelPack.Head.Id)
+			session.SendQueue.Put(channelPack)
 		}
-
-		session := context.ConnectSessionDict.Find(channelPack.Head.Id)
-		session.SendQueue.Put(channelPack)
 	}
 
 	context.SendQueue.Put(nil)
@@ -172,6 +173,7 @@ func serverChannel(channelConn net.Conn) {
 		} else {
 			connectAckPack := common.NewConnectAckPack(true).Serialize()
 			channelConn.Write(connectAckPack)
+			log.Printf("CONNECT ok %v", channelConn.RemoteAddr())
 			serverChannelConnect(context)
 		}
 

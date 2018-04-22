@@ -175,7 +175,8 @@ func (sessionDict *SessionDict) FinAll() {
 	defer sessionDict.mtx.Unlock()
 
 	for _, session := range (sessionDict.ConnectSessionDict) {
-		session.SendQueue.Put(nil)
+		finPack := NewFinPack(session.Id)
+		session.SendQueue.Put(finPack)
 		session.SendWaterMask.DropMaskTo(0)
 	}
 }
@@ -224,6 +225,7 @@ func NewContext(cmd int, channelConn net.Conn) *Context {
 	context.ConnectSessionDict = NewSessionDict()
 	context.Cmd = cmd
 	context.IdGen.InitWithMaxId(MaxId)
+	context.CloseCond = make(chan struct{}, 2)
 	return context
 }
 
@@ -241,7 +243,11 @@ func (channelPack *ChannelPack) Serialize() []byte {
 
 func ReadChannelPack(channelConn net.Conn) (*ChannelPack, error) {
 	channelPack := &ChannelPack{}
-	binary.Read(channelConn, binary.BigEndian, &channelPack.Head)
+	err := binary.Read(channelConn, binary.BigEndian, &channelPack.Head)
+
+	if err != nil {
+		return nil, err
+	}
 
 	if !channelPack.Head.IsLegal() {
 		return nil, errors.New("head isn't legal")
@@ -428,7 +434,7 @@ func NewSynPack(id uint32) *ChannelPack {
 	return channelPack
 }
 
-func NewSynAckPack(ok bool) *ChannelPack {
+func NewSynAckPack(id uint32, ok bool) *ChannelPack {
 	channelPack := &ChannelPack{}
 	if ok {
 		channelPack.Body = []byte("SYN OK")
@@ -437,7 +443,7 @@ func NewSynAckPack(ok bool) *ChannelPack {
 	}
 
 	channelPack.Head.Len = uint32(len(channelPack.Body))
-	channelPack.Head.Id = 0
+	channelPack.Head.Id = id
 	channelPack.Head.Cmd = true
 	return channelPack
 }

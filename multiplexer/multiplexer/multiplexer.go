@@ -40,7 +40,7 @@ func serveSession(context *common.Context, session *common.Session) {
 	recvPack := session.SendQueue.Take().(*common.ChannelPack)
 
 	if !recvPack.Head.IsCmd() || !recvPack.Body.IsSynOK() {
-		log.Printf("[%v]session SYN error remote: %v", session.Id, context.DmuxConnectAddr)
+		log.Printf("[%v]session SYN error remote:", session.Id)
 		return
 	}
 
@@ -56,9 +56,10 @@ func serveSession(context *common.Context, session *common.Session) {
 					break
 				} else if recvPack.Body.IsAck() {
 					ackBytes, err := recvPack.Body.GetAckBytes()
-					if err != nil {
+					if err == nil {
 						session.SendWaterMask.DropMask(ackBytes)
 					}
+					continue
 				}
 			}
 
@@ -92,7 +93,7 @@ func serveSession(context *common.Context, session *common.Session) {
 			break
 		}
 
-		payloadPack := common.NewPayloadPack(session.Id, buf[rn:])
+		payloadPack := common.NewPayloadPack(session.Id, buf[:rn])
 		context.SendQueue.Put(payloadPack)
 		session.SendWaterMask.RiseMask(uint32(rn))
 	}
@@ -232,7 +233,7 @@ func main() {
 
 	arg2 := strings.Split(arg[2], ":")
 	arg3 := strings.Split(arg[3], ":")
-	if len(arg2) != 3 || len(arg3) != 1 {
+	if len(arg2) != 4 || len(arg3) != 2 {
 		fmt.Println(usage)
 		return
 	}
