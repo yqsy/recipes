@@ -23,7 +23,7 @@ const (
 
 const (
 	// 包头的Len最多允许4Mib
-	MaxPackLen = 4 * 1024 * 1024
+	MaxBodyLen = 4 * 1024 * 1024
 )
 
 type IdGen struct {
@@ -116,7 +116,7 @@ type Session struct {
 	// 正确关闭方法:
 	// session <=== half close
 	// session ===> half close
-	CloseChannel chan struct{}
+	CloseCond chan struct{}
 
 	Id uint32
 }
@@ -126,7 +126,7 @@ func NewSession(conn net.Conn) *Session {
 	session.Conn = conn
 	session.SendWaterMask = NewSendWaterMask()
 	session.SendQueue = blockqueue.NewBlockQueue()
-	session.CloseChannel = make(chan struct{}, 2)
+	session.CloseCond = make(chan struct{}, 2)
 	return session
 }
 
@@ -150,6 +150,16 @@ func (sessionDict *SessionDict) Del(id uint32) {
 	sessionDict.mtx.Lock()
 	defer sessionDict.mtx.Unlock()
 	delete(sessionDict.ConnectSessionDict, id)
+}
+
+func (sessionDict *SessionDict) Find(id uint32) *Session {
+	sessionDict.mtx.Lock()
+	defer sessionDict.mtx.Unlock()
+	if val, ok := sessionDict.ConnectSessionDict[id]; ok {
+		return val
+	} else {
+		return nil
+	}
 }
 
 func (sessionDict *SessionDict) FinAll() {
@@ -190,6 +200,9 @@ type Context struct {
 
 	// 作为multiplexer的本地listener
 	MultiplexerLocalListener net.Listener
+
+
+	CloseCond chan struct{}
 }
 
 func NewContext(cmd int, channel net.Conn) *Context {
@@ -206,6 +219,9 @@ func NewContext(cmd int, channel net.Conn) *Context {
 type Msg struct {
 	Id   uint32
 	Data []byte
+
+	// 使channel block queue 本身停止工作
+	ChannelStop bool
 }
 
 func NewMsg(id uint32, data []byte) *Msg {
@@ -215,75 +231,93 @@ func NewMsg(id uint32, data []byte) *Msg {
 	return msg
 }
 
-type ChannelPack struct {
+type ChannelPack []byte
+
+type ChannelHeader struct {
 	Len uint32
 	Id  uint32
 	Cmd bool
 }
 
-type ChannelPackBytes []byte
+func (channelHeader *ChannelHeader) IsLegal() bool {
+	if channelHeader.Len > MaxBodyLen && channelHeader.Id <= MaxId {
+		return false
+	} else {
+		return true
+	}
+}
 
-func (channelPackBytes ChannelPackBytes) IsConnectOK() bool {
-	if string(channelPackBytes) == "CONNECT OK" {
+func (channelHeader *ChannelHeader) IsCmd() bool {
+	if channelHeader.Cmd {
 		return true
 	} else {
 		return false
 	}
 }
 
-func (channelPackBytes ChannelPackBytes) IsSynOK() bool {
-	if string(channelPackBytes) == "SYN OK" {
+type ChannelBody []byte
+
+func (channelBody ChannelBody) IsConnectOK() bool {
+	if string(channelBody) == "CONNECT OK" {
 		return true
 	} else {
 		return false
 	}
 }
 
-func ReadCmdLine(channelConn net.Conn) (ChannelPackBytes, error) {
-	channelPack := &ChannelPack{}
+func (channelBody ChannelBody) IsSynOK() bool {
+	if string(channelBody) == "SYN OK" {
+		return true
+	} else {
+		return false
+	}
+}
 
-	binary.Read(channelConn, binary.BigEndian, channelPack)
+func ReadCmdLine(channelConn net.Conn) (ChannelBody, error) {
+	channelHeader := &ChannelHeader{}
 
-	if channelPack.Len > MaxPackLen {
-		return ChannelPackBytes{}, errors.New("packet too long")
+	binary.Read(channelConn, binary.BigEndian, channelHeader)
+
+	if !channelHeader.IsLegal() {
+		return ChannelBody{}, errors.New("packet too long")
 	}
 
-	if !channelPack.Cmd {
-		return ChannelPackBytes{}, errors.New("not cmd")
+	if !channelHeader.IsCmd() {
+		return ChannelBody{}, errors.New("not cmd")
 	}
 
-	buf := make([]byte, channelPack.Len)
+	buf := make([]byte, channelHeader.Len)
 	rn, err := io.ReadFull(channelConn, buf)
 
 	if err != nil || rn != len(buf) {
-		return ChannelPackBytes{}, errors.New("cmd error")
+		return ChannelBody{}, errors.New("cmd error")
 	}
 
 	return buf, nil
 }
 
-func NewConnectPack(remoteConnectAddr string) ChannelPackBytes {
-	pack := []byte(fmt.Sprintf("CONNECT %v", remoteConnectAddr))
-	channelPack := &ChannelPack{}
-	channelPack.Len = uint32(len(pack))
-	channelPack.Id = 0
-	channelPack.Cmd = true
+func NewConnectPack(remoteConnectAddr string) ChannelPack {
+	body := []byte(fmt.Sprintf("CONNECT %v", remoteConnectAddr))
+	channelHeader := &ChannelHeader{}
+	channelHeader.Len = uint32(len(body))
+	channelHeader.Id = 0
+	channelHeader.Cmd = true
 
 	var buf bytes.Buffer
-	buf.Write(pack)
-	binary.Write(&buf, binary.BigEndian, channelPack)
+	binary.Write(&buf, binary.BigEndian, channelHeader)
+	buf.Write(body)
 	return buf.Bytes()
 }
 
-func NewConnectAckPack() ChannelPackBytes {
-	pack := []byte("CONNECT OK")
-	channelPack := &ChannelPack{}
-	channelPack.Len = uint32(len(pack))
-	channelPack.Id = 0
-	channelPack.Cmd = true
+func NewConnectAckPack() ChannelPack {
+	body := []byte("CONNECT OK")
+	channelHeader := &ChannelHeader{}
+	channelHeader.Len = uint32(len(body))
+	channelHeader.Id = 0
+	channelHeader.Cmd = true
 
 	var buf bytes.Buffer
-	buf.Write(pack)
-	binary.Write(&buf, binary.BigEndian, channelPack)
+	binary.Write(&buf, binary.BigEndian, channelHeader)
+	buf.Write(body)
 	return buf.Bytes()
 }
