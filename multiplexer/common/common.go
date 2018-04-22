@@ -7,8 +7,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"io"
 	"fmt"
+	"io"
+	"strings"
+	"bufio"
+	"strconv"
 )
 
 const (
@@ -24,6 +27,9 @@ const (
 const (
 	// 包头的Len最多允许4Mib
 	MaxBodyLen = 4 * 1024 * 1024
+
+	Connect = 0
+	Bind    = 1
 )
 
 type IdGen struct {
@@ -82,10 +88,17 @@ func (waterMask *SendWaterMask) RiseMask(n uint32) {
 	waterMask.waterMask += n
 }
 
-func (waterMask *SendWaterMask) DropMask() {
+func (waterMask *SendWaterMask) DropMask(mask uint32) {
 	waterMask.mtx.Lock()
 	defer waterMask.mtx.Unlock()
 	waterMask.waterMask = 0
+	waterMask.cond.Signal()
+}
+
+func (waterMask *SendWaterMask) DropMaskTo(mask uint32) {
+	waterMask.mtx.Lock()
+	defer waterMask.mtx.Unlock()
+	waterMask.waterMask = mask
 	waterMask.cond.Signal()
 }
 
@@ -130,20 +143,15 @@ func NewSession(conn net.Conn) *Session {
 	return session
 }
 
-const (
-	Connect = 0
-	Bind    = 1
-)
-
 type SessionDict struct {
 	ConnectSessionDict map[uint32]*Session
 	mtx                sync.Mutex
 }
 
-func (sessionDict *SessionDict) Append(id uint32, session *Session) {
+func (sessionDict *SessionDict) Append(session *Session) {
 	sessionDict.mtx.Lock()
 	defer sessionDict.mtx.Unlock()
-	sessionDict.ConnectSessionDict[id] = session
+	sessionDict.ConnectSessionDict[session.Id] = session
 }
 
 func (sessionDict *SessionDict) Del(id uint32) {
@@ -168,7 +176,7 @@ func (sessionDict *SessionDict) FinAll() {
 
 	for _, session := range (sessionDict.ConnectSessionDict) {
 		session.SendQueue.Put(nil)
-		session.SendWaterMask.DropMask()
+		session.SendWaterMask.DropMaskTo(0)
 	}
 }
 
@@ -178,11 +186,10 @@ func NewSessionDict() *SessionDict {
 	return sessionDict
 }
 
-// 1. 作为服务端要同时维护多个context
-// 2. 有两种主要的功能1. 类似ssh -NL 2. 类似ssh -NR
+// 作为服务端要同时维护多个context
 type Context struct {
 	// 读channel阻塞read
-	Channel net.Conn
+	ChannelConn net.Conn
 
 	// 写channel阻塞等待blockqueue
 	SendQueue *blockqueue.BlockQueue
@@ -201,13 +208,18 @@ type Context struct {
 	// 作为multiplexer的本地listener
 	MultiplexerLocalListener net.Listener
 
+	// 作为dmux时CONNECT功能所连接的地址
+	DmuxConnectAddr string
 
+	// 与channel正确关闭方法:
+	//  <=== channel half close
+	//  ===> channel half close
 	CloseCond chan struct{}
 }
 
-func NewContext(cmd int, channel net.Conn) *Context {
+func NewContext(cmd int, channelConn net.Conn) *Context {
 	context := &Context{}
-	context.Channel = channel
+	context.ChannelConn = channelConn
 	context.SendQueue = blockqueue.NewBlockQueue()
 	context.ConnectSessionDict = NewSessionDict()
 	context.Cmd = cmd
@@ -215,39 +227,60 @@ func NewContext(cmd int, channel net.Conn) *Context {
 	return context
 }
 
-// 消息队列传送数据
-type Msg struct {
-	Id   uint32
-	Data []byte
-
-	// 使channel block queue 本身停止工作
-	ChannelStop bool
+type ChannelPack struct {
+	Head ChannelHead
+	Body ChannelBody
 }
 
-func NewMsg(id uint32, data []byte) *Msg {
-	msg := &Msg{}
-	msg.Id = id
-	msg.Data = data
-	return msg
+func (channelPack *ChannelPack) Serialize() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, &channelPack.Head)
+	buf.Write(channelPack.Body)
+	return buf.Bytes()
 }
 
-type ChannelPack []byte
+func ReadChannelPack(channelConn net.Conn) (*ChannelPack, error) {
+	channelPack := &ChannelPack{}
+	binary.Read(channelConn, binary.BigEndian, &channelPack.Head)
 
-type ChannelHeader struct {
+	if !channelPack.Head.IsLegal() {
+		return nil, errors.New("head isn't legal")
+	}
+
+	channelPack.Body = make([]byte, channelPack.Head.Len)
+	rn, err := io.ReadFull(channelConn, channelPack.Body)
+
+	if err != nil || rn != len(channelPack.Body) {
+		return nil, errors.New("read body error")
+	}
+
+	return channelPack, nil
+}
+
+func ReadChannelCmd(channelConn net.Conn) (ChannelBody, error) {
+	channelPack, err := ReadChannelPack(channelConn)
+	if err != nil {
+		return ChannelBody{}, err
+	} else {
+		return channelPack.Body, nil
+	}
+}
+
+type ChannelHead struct {
 	Len uint32
 	Id  uint32
 	Cmd bool
 }
 
-func (channelHeader *ChannelHeader) IsLegal() bool {
-	if channelHeader.Len > MaxBodyLen && channelHeader.Id <= MaxId {
+func (channelHeader *ChannelHead) IsLegal() bool {
+	if channelHeader.Len > MaxBodyLen || channelHeader.Id > MaxId {
 		return false
 	} else {
 		return true
 	}
 }
 
-func (channelHeader *ChannelHeader) IsCmd() bool {
+func (channelHeader *ChannelHead) IsCmd() bool {
 	if channelHeader.Cmd {
 		return true
 	} else {
@@ -257,8 +290,40 @@ func (channelHeader *ChannelHeader) IsCmd() bool {
 
 type ChannelBody []byte
 
+func (channelBody ChannelBody) IsConnect() bool {
+	if strings.HasPrefix(string(channelBody), "CONNECT") {
+		return true
+	} else {
+		return false
+	}
+}
+
 func (channelBody ChannelBody) IsConnectOK() bool {
 	if string(channelBody) == "CONNECT OK" {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (channelBody ChannelBody) IsBind() bool {
+	if strings.HasPrefix(string(channelBody), "BIND") {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (channelBody ChannelBody) IsBindOK() bool {
+	if string(channelBody) == "BIND OK" {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (channelBody ChannelBody) IsSyn() bool {
+	if string(channelBody) == "SYN" {
 		return true
 	} else {
 		return false
@@ -273,51 +338,124 @@ func (channelBody ChannelBody) IsSynOK() bool {
 	}
 }
 
-func ReadCmdLine(channelConn net.Conn) (ChannelBody, error) {
-	channelHeader := &ChannelHeader{}
-
-	binary.Read(channelConn, binary.BigEndian, channelHeader)
-
-	if !channelHeader.IsLegal() {
-		return ChannelBody{}, errors.New("packet too long")
+func (channelBody ChannelBody) IsFin() bool {
+	if string(channelBody) == "FIN" {
+		return true
+	} else {
+		return false
 	}
-
-	if !channelHeader.IsCmd() {
-		return ChannelBody{}, errors.New("not cmd")
-	}
-
-	buf := make([]byte, channelHeader.Len)
-	rn, err := io.ReadFull(channelConn, buf)
-
-	if err != nil || rn != len(buf) {
-		return ChannelBody{}, errors.New("cmd error")
-	}
-
-	return buf, nil
 }
 
-func NewConnectPack(remoteConnectAddr string) ChannelPack {
-	body := []byte(fmt.Sprintf("CONNECT %v", remoteConnectAddr))
-	channelHeader := &ChannelHeader{}
-	channelHeader.Len = uint32(len(body))
-	channelHeader.Id = 0
-	channelHeader.Cmd = true
-
-	var buf bytes.Buffer
-	binary.Write(&buf, binary.BigEndian, channelHeader)
-	buf.Write(body)
-	return buf.Bytes()
+func (channelBody ChannelBody) IsAck() bool {
+	if strings.HasPrefix(string(channelBody), "ACK") {
+		return true
+	} else {
+		return false
+	}
 }
 
-func NewConnectAckPack() ChannelPack {
-	body := []byte("CONNECT OK")
-	channelHeader := &ChannelHeader{}
-	channelHeader.Len = uint32(len(body))
-	channelHeader.Id = 0
-	channelHeader.Cmd = true
+// TODO: 最好能写成分词语句到结构体的转换
+func (channelBody ChannelBody) GetAckBytes() (uint32, error) {
+	scanner := bufio.NewScanner(strings.NewReader(string(channelBody)))
+	scanner.Split(bufio.ScanWords)
 
-	var buf bytes.Buffer
-	binary.Write(&buf, binary.BigEndian, channelHeader)
-	buf.Write(body)
-	return buf.Bytes()
+	if !scanner.Scan() || scanner.Text() != "ACK" {
+		return 0, errors.New("not ACK")
+	}
+
+	if !scanner.Scan() {
+		return 0, errors.New("no bytes")
+	}
+
+	ackBytes, err := strconv.Atoi(scanner.Text())
+	return uint32(ackBytes), err
+}
+
+func (channelBody ChannelBody) GetConnectAddr() (string, error) {
+	scanner := bufio.NewScanner(strings.NewReader(string(channelBody)))
+	scanner.Split(bufio.ScanWords)
+
+	if !scanner.Scan() || scanner.Text() != "CONNECT" {
+		return "", errors.New("not CONNECT")
+	}
+
+	if !scanner.Scan() {
+		return "", errors.New("no addr")
+	}
+
+	connectAddr := scanner.Text()
+	return connectAddr, nil
+}
+
+func NewPayloadPack(id uint32, body ChannelBody) *ChannelPack {
+	channelPack := &ChannelPack{}
+	channelPack.Body = body
+	channelPack.Head.Len = uint32(len(channelPack.Body))
+	channelPack.Head.Id = id
+	channelPack.Head.Cmd = false
+	return channelPack
+}
+
+func NewConnectPack(remoteConnectAddr string) *ChannelPack {
+	channelPack := &ChannelPack{}
+	channelPack.Body = []byte(fmt.Sprintf("CONNECT %v", remoteConnectAddr))
+	channelPack.Head.Len = uint32(len(channelPack.Body))
+	channelPack.Head.Id = 0
+	channelPack.Head.Cmd = true
+	return channelPack
+}
+
+func NewConnectAckPack(ok bool) *ChannelPack {
+	channelPack := &ChannelPack{}
+	if ok {
+		channelPack.Body = []byte("CONNECT OK")
+	} else {
+		channelPack.Body = []byte("CONNECT ERROR")
+	}
+
+	channelPack.Head.Len = uint32(len(channelPack.Body))
+	channelPack.Head.Id = 0
+	channelPack.Head.Cmd = true
+	return channelPack
+}
+
+func NewSynPack(id uint32) *ChannelPack {
+	channelPack := &ChannelPack{}
+	channelPack.Body = []byte("SYN")
+	channelPack.Head.Len = uint32(len(channelPack.Body))
+	channelPack.Head.Id = id
+	channelPack.Head.Cmd = true
+	return channelPack
+}
+
+func NewSynAckPack(ok bool) *ChannelPack {
+	channelPack := &ChannelPack{}
+	if ok {
+		channelPack.Body = []byte("SYN OK")
+	} else {
+		channelPack.Body = []byte("SYN ERROR")
+	}
+
+	channelPack.Head.Len = uint32(len(channelPack.Body))
+	channelPack.Head.Id = 0
+	channelPack.Head.Cmd = true
+	return channelPack
+}
+
+func NewAckPack(id uint32, ackBytes uint32) *ChannelPack {
+	channelPack := &ChannelPack{}
+	channelPack.Body = []byte(fmt.Sprintf("ACK %v", ackBytes))
+	channelPack.Head.Len = uint32(len(channelPack.Body))
+	channelPack.Head.Id = id
+	channelPack.Head.Cmd = true
+	return channelPack
+}
+
+func NewFinPack(id uint32) *ChannelPack {
+	channelPack := &ChannelPack{}
+	channelPack.Body = []byte("FIN")
+	channelPack.Head.Len = uint32(len(channelPack.Body))
+	channelPack.Head.Id = id
+	channelPack.Head.Cmd = true
+	return channelPack
 }

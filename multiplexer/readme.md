@@ -60,7 +60,7 @@ multiplexer:
 
 建立channel握手:
 * CONNECT ip:port
-* CONNECT OK
+* CONNECT OK / CONNECT ERROR
 * BIND ip:port
 * BIND OK / BIND ERROR
 ---

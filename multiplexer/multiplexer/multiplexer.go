@@ -8,8 +8,6 @@ import (
 	"net"
 	"log"
 	"time"
-	"encoding/binary"
-	"io"
 )
 
 var usage = `Usage:
@@ -33,42 +31,46 @@ func serveSession(context *common.Context, session *common.Session) {
 		log.Printf("release id: %v", session.Id)
 	}()
 
-	context.ConnectSessionDict.Append(session.Id, session)
+	context.ConnectSessionDict.Append(session)
 	defer context.ConnectSessionDict.Del(session.Id)
 
 	// SYN
-	synMsg := common.NewMsg(session.Id, []byte("SYN"))
-	context.SendQueue.Put(synMsg)
-	val := session.SendQueue.Take()
-	if val == nil || !val.(*common.ChannelBody).IsSynOK() {
-		log.Printf("[%v]%v <-> dmux [dmux] SYN ERROR", session.Id, session.Conn.RemoteAddr())
+	synPack := common.NewSynPack(session.Id)
+	context.SendQueue.Put(synPack)
+	recvPack := session.SendQueue.Take().(*common.ChannelPack)
+
+	if !recvPack.Head.IsCmd() || !recvPack.Body.IsSynOK() {
+		log.Printf("[%v]session SYN error remote: %v", session.Id, context.DmuxConnectAddr)
 		return
 	}
 
-	log.Printf("[%v]%v <-> dmux relay", session.Id, session.Conn.RemoteAddr())
+	log.Printf("[%v]session <-> channel relay", session.Id)
 
-	// 维护session <-(阻塞blockqueue) multiplexer
+	// session <-block queue channel
 	go func(context *common.Context, session *common.Session) {
 		for {
-			val := session.SendQueue.Take()
+			recvPack := session.SendQueue.Take().(*common.ChannelPack)
 
-			// FIN
-			if val == nil {
-				break
+			if recvPack.Head.IsCmd() {
+				if recvPack.Body.IsFin() {
+					break
+				} else if recvPack.Body.IsAck() {
+					ackBytes, err := recvPack.Body.GetAckBytes()
+					if err != nil {
+						session.SendWaterMask.DropMask(ackBytes)
+					}
+				}
 			}
 
-			msg := val.(*common.Msg)
-
-			wn, err := session.Conn.Write(msg.Data)
-			if err != nil || wn != len(msg.Data) {
+			wn, err := session.Conn.Write(recvPack.Body)
+			if err != nil || wn != len(recvPack.Body) {
 				break
 			}
 
 			session.RecvWaterMask += uint32(wn)
 			if session.RecvWaterMask > common.ResumeWaterMask {
-				ackPack := []byte(fmt.Sprintf("ACK %v", session.RecvWaterMask))
-				ackMsg := common.NewMsg(session.Id, ackPack)
-				context.SendQueue.Put(ackMsg)
+				ackPack := common.NewAckPack(session.Id, session.RecvWaterMask)
+				context.SendQueue.Put(ackPack)
 				session.RecvWaterMask = 0
 			}
 		}
@@ -76,10 +78,10 @@ func serveSession(context *common.Context, session *common.Session) {
 		// half close
 		session.Conn.(*net.TCPConn).CloseWrite()
 		session.CloseCond <- struct{}{}
-		log.Printf("[%v]%v <- dmux done", session.Id, session.Conn.RemoteAddr())
+		log.Printf("[%v]session <- channel done", session.Id)
 	}(context, session)
 
-	// session (阻塞read)-> multiplexer 投递到blockqueue中
+	// session (阻塞read)-> channel
 	for {
 		session.SendWaterMask.WaitUntilCanBeWrite()
 
@@ -90,21 +92,23 @@ func serveSession(context *common.Context, session *common.Session) {
 			break
 		}
 
-		payload := common.NewMsg(session.Id, buf[rn:])
-		context.SendQueue.Put(payload)
+		payloadPack := common.NewPayloadPack(session.Id, buf[rn:])
+		context.SendQueue.Put(payloadPack)
 		session.SendWaterMask.RiseMask(uint32(rn))
 	}
 
 	// half close
-	finMsg := common.NewMsg(session.Id, nil)
-	context.SendQueue.Put(finMsg)
+	finPack := common.NewFinPack(session.Id)
+	context.SendQueue.Put(finPack)
 	session.CloseCond <- struct{}{}
-	log.Printf("[%v]%v -> dmux done", session.Id, session.Conn.RemoteAddr())
+	log.Printf("[%v]session -> channel done", session.Id)
 
 	// 两边都半关闭完,释放连接
 	for i := 0; i < 2; i++ {
 		<-session.CloseCond
 	}
+
+	log.Printf("[%v]session <-> channel done", session.Id)
 }
 
 func serveLocalListener(context *common.Context) {
@@ -119,65 +123,63 @@ func serveLocalListener(context *common.Context) {
 		session := common.NewSession(conn)
 		go serveSession(context, session)
 	}
+
+	log.Printf("listener close")
 }
 
-func serveChannel(context *common.Context) {
-	defer context.Channel.Close()
+func serverChannelConnect(context *common.Context) {
+	defer context.ChannelConn.Close()
 
-	// 维护multiplexer -> channel (阻塞blockqueue)
+	// send channel (block queue , event loop)
 	go func(context *common.Context) {
+		for {
 
+			val := context.SendQueue.Take()
+			// 退出的接口
+			if val == nil {
+				break
+			}
+			sendPack := val.(*common.ChannelPack)
+			sendBytes := sendPack.Serialize()
+			wn, err := context.ChannelConn.Write(sendBytes)
+
+			if err != nil || wn != len(sendBytes) {
+				break
+			}
+		}
+
+		context.CloseCond <- struct{}{}
 	}(context)
 
-	// multiplexer <-(阻塞read) channel
+	// channel -> session
 	for {
-		channelHeader := &common.ChannelHeader{}
-		err := binary.Read(context.Channel, binary.BigEndian, &channelHeader)
+		channelPack, err := common.ReadChannelPack(context.ChannelConn)
+
 		if err != nil {
 			break
 		}
-
-		if !channelHeader.IsLegal() {
-			break
-		}
-
-		buf := make([]byte, channelHeader.Len)
-		rn, err := io.ReadFull(context.Channel, buf)
-
-		if err != nil || rn != len(buf) {
-			break
-		}
-
-		session := context.ConnectSessionDict.Find(channelHeader.Id)
-		if session == nil {
-			log.Printf("not find id [%d] in dict", channelHeader.Id)
-			continue
-		}
-
-		if channelHeader.IsCmd() && string(buf) == "FIN" {
-			finMsg := common.NewMsg(session.Id, nil)
-			session.SendQueue.Put(finMsg)
-		} else {
-			payload := common.NewMsg(channelHeader.Id, buf[rn:])
-			session.SendQueue.Put(payload)
-		}
+		session := context.ConnectSessionDict.Find(channelPack.Head.Id)
+		session.SendQueue.Put(channelPack)
 	}
 
-	stopMsg := common.NewMsg(0,nil)
-	stopMsg.ChannelStop = true
-	context.SendQueue.Put(stopMsg)
-
+	context.SendQueue.Put(nil)
 	context.ConnectSessionDict.FinAll()
+	context.CloseCond <- struct{}{}
+
+	for i := 0; i < 2; i++ {
+		<-context.CloseCond
+	}
+	log.Printf("read EOF from channel , reconnect channel")
 }
 
-func doLocalWay(arg []string) {
+func doConnectWay(arg []string) {
 	pair := strings.Split(arg[2], ":")
 	localListenAddr := pair[0] + ":" + pair[1]
 	remoteConnectAddr := pair[2] + ":" + pair[3]
 	dmuxAddr := arg[3]
 
 	for {
-		conn, err := net.Dial("tcp", dmuxAddr)
+		channelConn, err := net.Dial("tcp", dmuxAddr)
 
 		if err != nil {
 			log.Printf("dial error %v", dmuxAddr)
@@ -185,14 +187,14 @@ func doLocalWay(arg []string) {
 			continue
 		}
 
-		connectSynPack := common.NewConnectPack(remoteConnectAddr)
-		wn, err := conn.Write(connectSynPack)
-		if err != nil || wn != len(connectSynPack) {
+		connectPack := common.NewConnectPack(remoteConnectAddr).Serialize()
+		wn, err := channelConn.Write(connectPack)
+		if err != nil || wn != len(connectPack) {
 			log.Printf("CONNECT error")
 			continue
 		}
 
-		cmd, err := common.ReadCmdLine(conn)
+		cmd, err := common.ReadChannelCmd(channelConn)
 		if err != nil || !cmd.IsConnectOK() {
 			log.Printf("CONNECT error")
 			continue
@@ -200,7 +202,7 @@ func doLocalWay(arg []string) {
 
 		log.Printf("CONNECT ok %v", dmuxAddr)
 
-		context := common.NewContext(common.Connect, conn)
+		context := common.NewContext(common.Connect, channelConn)
 		context.MultiplexerLocalListener, err = net.Listen("tcp", localListenAddr)
 		if err != nil {
 			panic(err)
@@ -208,16 +210,14 @@ func doLocalWay(arg []string) {
 
 		go serveLocalListener(context)
 
-		serveChannel(context)
+		serverChannelConnect(context)
 
 		// 在这里关闭,保证重启channel时能listen成功
 		context.MultiplexerLocalListener.Close()
-
-		fmt.Printf("read EOF from dmux, close listener: %v", context.MultiplexerLocalListener.Addr())
 	}
 }
 
-func doRemoteWay(arg []string) {
+func doBindWay(arg []string) {
 
 }
 
@@ -238,9 +238,9 @@ func main() {
 	}
 
 	if arg[1] == "-L" {
-		doLocalWay(arg)
+		doConnectWay(arg)
 	} else if arg[1] == "-R" {
-		doRemoteWay(arg)
+		doBindWay(arg)
 	} else {
 		fmt.Println(usage)
 	}
