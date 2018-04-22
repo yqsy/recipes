@@ -63,12 +63,9 @@ func serveSession(context *common.Context, session *common.Session) {
 				}
 			}
 
-			wn, err := session.Conn.Write(recvPack.Body)
-			if err != nil || wn != len(recvPack.Body) {
-				break
-			}
+			session.Conn.Write(recvPack.Body)
 
-			session.RecvWaterMask += uint32(wn)
+			session.RecvWaterMask += uint32(len(recvPack.Body))
 			if session.RecvWaterMask > common.ResumeWaterMask {
 				ackPack := common.NewAckPack(session.Id, session.RecvWaterMask)
 				context.SendQueue.Put(ackPack)
@@ -161,6 +158,10 @@ func serverChannelConnect(context *common.Context) {
 			break
 		}
 		session := context.ConnectSessionDict.Find(channelPack.Head.Id)
+
+		if session == nil {
+			panic(fmt.Sprintf("can't find session id:%v cmd:%v bodylen:%v", channelPack.Head.Id, channelPack.Head.IsCmd(), len(channelPack.Body)))
+		}
 		session.SendQueue.Put(channelPack)
 	}
 
