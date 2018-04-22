@@ -250,7 +250,7 @@ func ReadChannelPack(channelConn net.Conn) (*ChannelPack, error) {
 	}
 
 	if !channelPack.Head.IsLegal() {
-		return nil, errors.New("head isn't legal")
+		return nil, errors.New(fmt.Sprintf("head isn't legal len:%v id:%v", channelPack.Head.Len, channelPack.Head.Id))
 	}
 
 	channelPack.Body = make([]byte, channelPack.Head.Len)

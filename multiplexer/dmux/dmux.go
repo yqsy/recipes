@@ -59,7 +59,7 @@ func serverSession(context *common.Context, session *common.Session) {
 	for {
 		session.SendWaterMask.WaitUntilCanBeWrite()
 
-		buf := make([]byte, 16*1024*1024)
+		buf := make([]byte, 16*1024)
 		rn, err := session.Conn.Read(buf)
 
 		if err != nil {
