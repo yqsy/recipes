@@ -123,6 +123,9 @@ type Session struct {
 	// 写成功后累加接收水位,累加水位到达一定高度时发送ack给channel
 	SendQueue *blockqueue.BlockQueue
 
+	// 专门处理Channel发过来的ACK包,用来降低session的水位
+	AckQueue *blockqueue.BlockQueue
+
 	// 接收水位(成功消费掉水位后,向channel发送ack,让对方继续发送数据)
 	RecvWaterMask uint32
 
@@ -132,6 +135,9 @@ type Session struct {
 	CloseCond chan struct{}
 
 	Id uint32
+
+	// 防止channnel本身连接关闭时,因得不到ACK,阻塞在等待水位上
+	ChannelIsClose bool
 }
 
 func NewSession(conn net.Conn) *Session {
@@ -139,6 +145,7 @@ func NewSession(conn net.Conn) *Session {
 	session.Conn = conn
 	session.SendWaterMask = NewSendWaterMask()
 	session.SendQueue = blockqueue.NewBlockQueue()
+	session.AckQueue = blockqueue.NewBlockQueue()
 	session.CloseCond = make(chan struct{}, 2)
 	return session
 }
@@ -177,6 +184,7 @@ func (sessionDict *SessionDict) FinAll() {
 	for _, session := range sessionDict.ConnectSessionDict {
 		finPack := NewFinPack(session.Id)
 		session.SendQueue.Put(finPack)
+		session.ChannelIsClose = true
 		session.SendWaterMask.DropMaskTo(0)
 	}
 }

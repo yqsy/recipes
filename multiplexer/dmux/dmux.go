@@ -19,21 +19,34 @@ func serverSession(context *common.Context, session *common.Session) {
 
 	log.Printf("[%v]session <-> channel relay", session.Id)
 
+	// session <-block queue channel ack处理
+	go func(context *common.Context, session *common.Session) {
+		for {
+			val := session.AckQueue.Take()
+
+			if val == nil {
+				break
+			}
+
+			recvPack := val.(*common.ChannelPack)
+			if recvPack.Head.IsCmd() && recvPack.Body.IsAck() {
+				ackBytes, err := recvPack.Body.GetAckBytes()
+				if err == nil {
+					session.SendWaterMask.DropMask(ackBytes)
+				}
+			}
+		}
+
+		log.Printf("[%v]session ack done", session.Id)
+	}(context, session)
+
 	// session <-block queue channel
 	go func(context *common.Context, session *common.Session) {
 		for {
 			recvPack := session.SendQueue.Take().(*common.ChannelPack)
 
-			if recvPack.Head.IsCmd() {
-				if recvPack.Body.IsFin() {
-					break
-				} else if recvPack.Body.IsAck() {
-					ackBytes, err := recvPack.Body.GetAckBytes()
-					if err == nil {
-						session.SendWaterMask.DropMask(ackBytes)
-					}
-					continue
-				}
+			if recvPack.Head.IsCmd() && recvPack.Body.IsFin() {
+				break
 			}
 
 			session.Conn.Write(recvPack.Body)
@@ -55,6 +68,10 @@ func serverSession(context *common.Context, session *common.Session) {
 	for {
 		session.SendWaterMask.WaitUntilCanBeWrite()
 
+		if session.ChannelIsClose {
+			break
+		}
+
 		buf := make([]byte, 16*1024)
 		rn, err := session.Conn.Read(buf)
 
@@ -72,6 +89,9 @@ func serverSession(context *common.Context, session *common.Session) {
 	context.SendQueue.Put(finPack)
 	session.CloseCond <- struct{}{}
 	log.Printf("[%v]session -> channel done", session.Id)
+
+	// stop ACK deal
+	session.AckQueue.Put(nil)
 
 	// 两边都半关闭完,释放连接
 	for i := 0; i < 2; i++ {
@@ -129,10 +149,21 @@ func serverChannelConnect(context *common.Context) {
 			}
 		} else {
 			session := context.ConnectSessionDict.Find(channelPack.Head.Id)
+
 			if session == nil {
-				panic(fmt.Sprintf("can't find session id:%v cmd:%v bodylen:%v", channelPack.Head.Id, channelPack.Head.IsCmd(), len(channelPack.Body)))
+				var cmd string
+				if len(channelPack.Body) < 20 {
+					cmd = string(channelPack.Body)
+				}
+				log.Printf("can't find session id:%v cmd:%v body:%v", channelPack.Head.Id, channelPack.Head.IsCmd(), cmd)
+				continue
 			}
-			session.SendQueue.Put(channelPack)
+
+			if channelPack.Head.IsCmd() && channelPack.Body.IsAck() {
+				session.AckQueue.Put(channelPack)
+			} else {
+				session.SendQueue.Put(channelPack)
+			}
 		}
 	}
 
