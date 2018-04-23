@@ -12,108 +12,69 @@ import (
 var usage = `Usage:
 %v listenip:listenport`
 
-func serverSession(context *common.Context, session *common.Session) {
-	defer session.Conn.Close()
-
-	defer context.ConnectSessionDict.Del(session.Id)
-
-	log.Printf("[%v]session <-> channel relay", session.Id)
-
-	// session <-block queue channel ack处理
-	go common.SessionAckEventLoop(context, session)
-
-	// session <-block queue channel
-	go common.SessionSendEventLoop(context, session)
-
-	// session (阻塞read)-> channel
-	common.SessionReadEventLoop(context, session)
-
-	// 两边都半关闭完,释放连接
-	for i := 0; i < 2; i++ {
-		<-session.CloseCond
-	}
-
-	log.Printf("[%v]session <-> channel done", session.Id)
-}
-
 func serverChannelConnect(context *common.Context) {
-
-	// send channel (block queue , event loop)
-	go common.ChannelSendEventLoop(context)
-
-	// channel -> session
-	for {
-		channelPack, err := common.ReadChannelPack(context.ChannelConn)
-
-		if err != nil {
-			break
-		}
-
-		if channelPack.Head.IsCmd() && channelPack.Body.IsSyn() {
-			conn, err := net.Dial("tcp", context.DmuxConnectAddr)
-			if err != nil {
-				log.Printf("dial error %v", err)
-				synAckPack := common.NewSynAckPack(channelPack.Head.Id, false).Serialize()
-				context.ChannelConn.Write(synAckPack)
-			} else {
-				synAckPack := common.NewSynAckPack(channelPack.Head.Id, true).Serialize()
-				context.ChannelConn.Write(synAckPack)
-
-				session := common.NewSession(conn)
-				session.Id = channelPack.Head.Id
-				context.ConnectSessionDict.Append(session)
-				go serverSession(context, session)
-			}
-		} else {
-			common.DispatchToSession(context, channelPack)
-		}
-	}
-
-	context.SendQueue.Put(nil)
-	context.ConnectSessionDict.FinAll()
-	context.CloseCond <- struct{}{}
-
-	for i := 0; i < 2; i++ {
-		<-context.CloseCond
-	}
-
+	common.ServerChannelPassive(context, context.DmuxConnectAddr)
 	log.Printf("read EOF from channel , reaccept channel")
 }
 
 func serverChannelBind(context *common.Context) {
-
+	common.ServerChannelActive(context)
+	log.Printf("read EOF from channel , reaccept channel")
 }
 
-func serverChannel(channelConn net.Conn) {
-	defer channelConn.Close()
+func serverLocalListener(context *common.Context) {
+	for {
+		conn, err := context.DmuxLolcalListener.Accept()
 
-	cmd, err := common.ReadChannelCmd(channelConn)
-
-	if err != nil {
-		log.Printf("recv err cmd len: %v", len(cmd))
-		return
-	}
-
-	if cmd.IsConnect() {
-		// ssh -NL
-		context := common.NewContext(common.Connect, channelConn)
-		context.DmuxConnectAddr, err = cmd.GetConnectAddr()
+		// TODO: 因为channel的关闭会导致listener的关闭,所以我暂时没做描述符满的操作(怎么区别两种关闭?)
 		if err != nil {
-			log.Printf("CONNECT addr error: %v", err)
-			connectAckPack := common.NewConnectAckPack(false).Serialize()
-			channelConn.Write(connectAckPack)
-		} else {
-			connectAckPack := common.NewConnectAckPack(true).Serialize()
-			channelConn.Write(connectAckPack)
-			log.Printf("CONNECT ok %v", channelConn.RemoteAddr())
-			serverChannelConnect(context)
+			break
 		}
 
-	} else if cmd.IsBind() {
-		// ssh -NR
+		session := common.NewSession(conn)
+		go common.ServeSessionActive(context, session)
+	}
 
+	log.Printf("listener close")
+}
+
+func doConnectWay(channelConn net.Conn, cmd common.ChannelBody) {
+	context := common.NewContext(common.Connect, channelConn)
+	var err error
+	context.DmuxConnectAddr, err = cmd.GetConnectAddr()
+	if err != nil {
+		log.Printf("CONNECT addr error: %v", err)
+		connectAckPack := common.NewConnectAckPack(false).Serialize()
+		channelConn.Write(connectAckPack)
 	} else {
-		log.Printf("un sopported cmd len: %v", len(cmd))
+		connectAckPack := common.NewConnectAckPack(true).Serialize()
+		channelConn.Write(connectAckPack)
+		log.Printf("CONNECT ok %v", channelConn.RemoteAddr())
+		serverChannelConnect(context)
+	}
+}
+
+func doBindWay(channelConn net.Conn, cmd common.ChannelBody) {
+	context := common.NewContext(common.Connect, channelConn)
+	var err error
+	bindAddr, _ := cmd.GetBindAddr()
+
+	context.DmuxLolcalListener, err = net.Listen("tcp", bindAddr)
+	if err != nil {
+		log.Printf("BIND addr error: %v", err)
+		bindAckPack := common.NewBindAckPack(false).Serialize()
+		channelConn.Write(bindAckPack)
+	} else {
+		bindAckPack := common.NewBindAckPack(true).Serialize()
+		channelConn.Write(bindAckPack)
+		log.Printf("BIND ok %v", channelConn.RemoteAddr())
+
+		go serverLocalListener(context)
+
+		serverChannelBind(context)
+
+		// 在这里关闭,保证重启channel时能listen成功
+		context.DmuxLolcalListener.Close()
 	}
 }
 
@@ -140,6 +101,23 @@ func main() {
 			continue
 		}
 
-		go serverChannel(conn)
+		go func(channelConn net.Conn) {
+			defer channelConn.Close()
+
+			cmd, err := common.ReadChannelCmd(channelConn)
+
+			if err != nil {
+				log.Printf("recv err cmd len: %v", len(cmd))
+				return
+			}
+
+			if cmd.IsConnect() {
+				doConnectWay(channelConn, cmd)
+			} else if cmd.IsBind() {
+				doBindWay(channelConn, cmd)
+			} else {
+				log.Printf("un sopported cmd len: %v", len(cmd))
+			}
+		}(conn)
 	}
 }

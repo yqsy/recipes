@@ -215,11 +215,17 @@ type Context struct {
 	// BIND时dmux主动生成
 	IdGen IdGen
 
-	// 作为multiplexer的本地listener
+	// CONNECT的listener
 	MultiplexerLocalListener net.Listener
 
-	// 作为dmux时CONNECT功能所连接的地址
+	// CONNECT所连接的地址
 	DmuxConnectAddr string
+
+	// BIND所连接的地址
+	MultiplexerConnectAddr string
+
+	// BIND的listener
+	DmuxLolcalListener net.Listener
 
 	// 与channel正确关闭方法:
 	//  <=== channel half close
@@ -402,6 +408,22 @@ func (channelBody ChannelBody) GetConnectAddr() (string, error) {
 	return connectAddr, nil
 }
 
+func (channelBody ChannelBody) GetBindAddr() (string, error) {
+	scanner := bufio.NewScanner(strings.NewReader(string(channelBody)))
+	scanner.Split(bufio.ScanWords)
+
+	if !scanner.Scan() || scanner.Text() != "BIND" {
+		return "", errors.New("not BIND")
+	}
+
+	if !scanner.Scan() {
+		return "", errors.New("no addr")
+	}
+
+	bindAddr := scanner.Text()
+	return bindAddr, nil
+}
+
 func NewPayloadPack(id uint32, body ChannelBody) *ChannelPack {
 	channelPack := &ChannelPack{}
 	channelPack.Body = body
@@ -426,6 +448,29 @@ func NewConnectAckPack(ok bool) *ChannelPack {
 		channelPack.Body = []byte("CONNECT OK")
 	} else {
 		channelPack.Body = []byte("CONNECT ERROR")
+	}
+
+	channelPack.Head.Len = uint32(len(channelPack.Body))
+	channelPack.Head.Id = 0
+	channelPack.Head.Cmd = true
+	return channelPack
+}
+
+func NewBindPack(remoteListenAddr string) *ChannelPack {
+	channelPack := &ChannelPack{}
+	channelPack.Body = []byte(fmt.Sprintf("BIND %v", remoteListenAddr))
+	channelPack.Head.Len = uint32(len(channelPack.Body))
+	channelPack.Head.Id = 0
+	channelPack.Head.Cmd = true
+	return channelPack
+}
+
+func NewBindAckPack(ok bool) *ChannelPack {
+	channelPack := &ChannelPack{}
+	if ok {
+		channelPack.Body = []byte("BIND OK")
+	} else {
+		channelPack.Body = []byte("BIND ERROR")
 	}
 
 	channelPack.Head.Len = uint32(len(channelPack.Body))
@@ -475,6 +520,7 @@ func NewFinPack(id uint32) *ChannelPack {
 	return channelPack
 }
 
+// -> session
 func SessionSendEventLoop(context *Context, session *Session) {
 	for {
 		recvPack := session.SendQueue.Take().(*ChannelPack)
@@ -518,6 +564,7 @@ func SessionAckEventLoop(context *Context, session *Session) {
 	log.Printf("[%v]session ack done", session.Id)
 }
 
+// <- session
 func SessionReadEventLoop(context *Context, session *Session) {
 	for {
 		session.SendWaterMask.WaitUntilCanBeWrite()
@@ -548,6 +595,7 @@ func SessionReadEventLoop(context *Context, session *Session) {
 	session.AckQueue.Put(nil)
 }
 
+// -> channel
 func ChannelSendEventLoop(context *Context) {
 	for {
 
@@ -583,5 +631,146 @@ func DispatchToSession(context *Context, channelPack *ChannelPack) {
 		} else {
 			session.SendQueue.Put(channelPack)
 		}
+	}
+}
+
+// local accept
+func ServeSessionActive(context *Context, session *Session) {
+	defer session.Conn.Close()
+
+	var err error
+	session.Id, err = context.IdGen.GetFreeId()
+	if err != nil {
+		log.Printf("session id not enough")
+		return
+	}
+	defer func() {
+		context.IdGen.ReleaseId(session.Id)
+		log.Printf("release id: %v", session.Id)
+	}()
+
+	context.ConnectSessionDict.Append(session)
+	defer context.ConnectSessionDict.Del(session.Id)
+
+	// SYN
+	synPack := NewSynPack(session.Id)
+	context.SendQueue.Put(synPack)
+	recvPack := session.SendQueue.Take().(*ChannelPack)
+
+	if !recvPack.Head.IsCmd() || !recvPack.Body.IsSynOK() {
+		log.Printf("[%v]session SYN error", session.Id)
+		return
+	}
+
+	log.Printf("[%v]session <-> channel relay", session.Id)
+
+	// session <-block queue channel ack处理
+	go SessionAckEventLoop(context, session)
+
+	// session <-block queue channel
+	go SessionSendEventLoop(context, session)
+
+	// session (阻塞read)-> channel
+	SessionReadEventLoop(context, session)
+
+	// 两边都半关闭完,释放连接
+	for i := 0; i < 2; i++ {
+		<-session.CloseCond
+	}
+
+	log.Printf("[%v]session <-> channel done", session.Id)
+}
+
+// local connect
+func ServeSessionPassive(context *Context, session *Session) {
+	defer session.Conn.Close()
+
+	defer context.ConnectSessionDict.Del(session.Id)
+
+	log.Printf("[%v]session <-> channel relay", session.Id)
+
+	// session <-block queue channel ack处理
+	go SessionAckEventLoop(context, session)
+
+	// session <-block queue channel
+	go SessionSendEventLoop(context, session)
+
+	// session (阻塞read)-> channel
+	SessionReadEventLoop(context, session)
+
+	// 两边都半关闭完,释放连接
+	for i := 0; i < 2; i++ {
+		<-session.CloseCond
+	}
+
+	log.Printf("[%v]session <-> channel done", session.Id)
+}
+
+// 主动SYN方
+func ServerChannelActive(context *Context) {
+	defer context.ChannelConn.Close()
+
+	// send channel (block queue , event loop)
+	go ChannelSendEventLoop(context)
+
+	// channel -> session
+	for {
+		channelPack, err := ReadChannelPack(context.ChannelConn)
+
+		if err != nil {
+			break
+		}
+
+		DispatchToSession(context, channelPack)
+	}
+
+	context.SendQueue.Put(nil)
+	context.ConnectSessionDict.FinAll()
+	context.CloseCond <- struct{}{}
+
+	for i := 0; i < 2; i++ {
+		<-context.CloseCond
+	}
+}
+
+// 被动接收SYN,在本地去connect
+func ServerChannelPassive(context *Context, connectAddr string) {
+	// send channel (block queue , event loop)
+	go ChannelSendEventLoop(context)
+
+	// channel -> session
+	for {
+		channelPack, err := ReadChannelPack(context.ChannelConn)
+
+		if err != nil {
+			break
+		}
+
+		if channelPack.Head.IsCmd() && channelPack.Body.IsSyn() {
+			conn, err := net.Dial("tcp", connectAddr)
+			if err != nil {
+				log.Printf("dial error %v", err)
+				synAckPack := NewSynAckPack(channelPack.Head.Id, false).Serialize()
+				context.ChannelConn.Write(synAckPack)
+			} else {
+				synAckPack := NewSynAckPack(channelPack.Head.Id, true).Serialize()
+				context.ChannelConn.Write(synAckPack)
+
+				session := NewSession(conn)
+				session.Id = channelPack.Head.Id
+				context.ConnectSessionDict.Append(session)
+				go ServeSessionPassive(context, session)
+			}
+		} else {
+			DispatchToSession(context, channelPack)
+		}
+	}
+
+	context.SendQueue.Put(nil)
+	context.ConnectSessionDict.FinAll()
+	context.CloseCond <- struct{}{}
+
+	for i := 0; i < 2; i++ {
+		<-context.CloseCond
 	}
 }

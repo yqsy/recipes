@@ -17,76 +17,13 @@ var usage = `Usage:
 -L: local listen and connect to remote in channel
 -R: remote listen and connect to local in channel`
 
-func serveSession(context *common.Context, session *common.Session) {
-	defer session.Conn.Close()
-
-	var err error
-	session.Id, err = context.IdGen.GetFreeId()
-	if err != nil {
-		log.Printf("session id not enough")
-		return
-	}
-	defer func() {
-		context.IdGen.ReleaseId(session.Id)
-		log.Printf("release id: %v", session.Id)
-	}()
-
-	context.ConnectSessionDict.Append(session)
-	defer context.ConnectSessionDict.Del(session.Id)
-
-	// SYN
-	synPack := common.NewSynPack(session.Id)
-	context.SendQueue.Put(synPack)
-	recvPack := session.SendQueue.Take().(*common.ChannelPack)
-
-	if !recvPack.Head.IsCmd() || !recvPack.Body.IsSynOK() {
-		log.Printf("[%v]session SYN error", session.Id)
-		return
-	}
-
-	log.Printf("[%v]session <-> channel relay", session.Id)
-
-	// session <-block queue channel ack处理
-	go common.SessionAckEventLoop(context, session)
-
-	// session <-block queue channel
-	go common.SessionSendEventLoop(context, session)
-
-	// session (阻塞read)-> channel
-	common.SessionReadEventLoop(context, session)
-
-	// 两边都半关闭完,释放连接
-	for i := 0; i < 2; i++ {
-		<-session.CloseCond
-	}
-
-	log.Printf("[%v]session <-> channel done", session.Id)
+func serverChannelConnect(context *common.Context) {
+	common.ServerChannelActive(context)
+	log.Printf("read EOF from channel , reconnect channel")
 }
 
-func serverChannelConnect(context *common.Context) {
-	defer context.ChannelConn.Close()
-
-	// send channel (block queue , event loop)
-	go common.ChannelSendEventLoop(context)
-
-	// channel -> session
-	for {
-		channelPack, err := common.ReadChannelPack(context.ChannelConn)
-
-		if err != nil {
-			break
-		}
-
-		common.DispatchToSession(context, channelPack)
-	}
-
-	context.SendQueue.Put(nil)
-	context.ConnectSessionDict.FinAll()
-	context.CloseCond <- struct{}{}
-
-	for i := 0; i < 2; i++ {
-		<-context.CloseCond
-	}
+func serverChannelBind(context *common.Context) {
+	common.ServerChannelPassive(context, context.MultiplexerConnectAddr)
 	log.Printf("read EOF from channel , reconnect channel")
 }
 
@@ -100,7 +37,7 @@ func serveLocalListener(context *common.Context) {
 		}
 
 		session := common.NewSession(conn)
-		go serveSession(context, session)
+		go common.ServeSessionActive(context, session)
 	}
 
 	log.Printf("listener close")
@@ -152,7 +89,40 @@ func doConnectWay(arg []string) {
 }
 
 func doBindWay(arg []string) {
+	pair := strings.Split(arg[2], ":")
+	localConnectAddr := pair[0] + ":" + pair[1]
+	remoteListenAddr := pair[2] + ":" + pair[3]
+	dmuxAddr := arg[3]
 
+	for {
+		channelConn, err := net.Dial("tcp", dmuxAddr)
+
+		if err != nil {
+			log.Printf("dial error %v", dmuxAddr)
+			time.Sleep(time.Second * 3)
+			continue
+		}
+
+		bindPack := common.NewBindPack(remoteListenAddr).Serialize()
+		wn, err := channelConn.Write(bindPack)
+		if err != nil || wn != len(bindPack) {
+			log.Printf("BIND error")
+			continue
+		}
+
+		cmd, err := common.ReadChannelCmd(channelConn)
+		if err != nil || !cmd.IsBindOK() {
+			log.Printf("BIND error")
+			continue
+		}
+
+		log.Printf("BIND ok %v", dmuxAddr)
+
+		context := common.NewContext(common.Bind, channelConn)
+		context.MultiplexerConnectAddr = localConnectAddr
+
+		serverChannelBind(context)
+	}
 }
 
 func main() {
