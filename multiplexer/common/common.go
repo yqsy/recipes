@@ -12,6 +12,7 @@ import (
 	"strings"
 	"bufio"
 	"strconv"
+	"log"
 )
 
 const (
@@ -472,4 +473,115 @@ func NewFinPack(id uint32) *ChannelPack {
 	channelPack.Head.Id = id
 	channelPack.Head.Cmd = true
 	return channelPack
+}
+
+func SessionSendEventLoop(context *Context, session *Session) {
+	for {
+		recvPack := session.SendQueue.Take().(*ChannelPack)
+
+		if recvPack.Head.IsCmd() && recvPack.Body.IsFin() {
+			break
+		}
+
+		session.Conn.Write(recvPack.Body)
+		session.RecvWaterMask += uint32(len(recvPack.Body))
+		if session.RecvWaterMask > ResumeWaterMask {
+			ackPack := NewAckPack(session.Id, session.RecvWaterMask)
+			context.SendQueue.Put(ackPack)
+			session.RecvWaterMask = 0
+		}
+	}
+
+	// half close
+	session.Conn.(*net.TCPConn).CloseWrite()
+	session.CloseCond <- struct{}{}
+	log.Printf("[%v]session <- channel done", session.Id)
+}
+
+func SessionAckEventLoop(context *Context, session *Session) {
+	for {
+		val := session.AckQueue.Take()
+
+		if val == nil {
+			break
+		}
+
+		recvPack := val.(*ChannelPack)
+		if recvPack.Head.IsCmd() && recvPack.Body.IsAck() {
+			ackBytes, err := recvPack.Body.GetAckBytes()
+			if err == nil {
+				session.SendWaterMask.DropMask(ackBytes)
+			}
+		}
+	}
+
+	log.Printf("[%v]session ack done", session.Id)
+}
+
+func SessionReadEventLoop(context *Context, session *Session) {
+	for {
+		session.SendWaterMask.WaitUntilCanBeWrite()
+
+		if session.ChannelIsClose {
+			break
+		}
+
+		buf := make([]byte, 16*1024)
+		rn, err := session.Conn.Read(buf)
+
+		if err != nil {
+			break
+		}
+
+		payloadPack := NewPayloadPack(session.Id, buf[:rn])
+		context.SendQueue.Put(payloadPack)
+		session.SendWaterMask.RiseMask(uint32(rn))
+	}
+
+	// half close
+	finPack := NewFinPack(session.Id)
+	context.SendQueue.Put(finPack)
+	session.CloseCond <- struct{}{}
+	log.Printf("[%v]session -> channel done", session.Id)
+
+	// stop ACK deal
+	session.AckQueue.Put(nil)
+}
+
+func ChannelSendEventLoop(context *Context) {
+	for {
+
+		val := context.SendQueue.Take()
+		// 退出的接口
+		if val == nil {
+			break
+		}
+		sendPack := val.(*ChannelPack)
+		sendBytes := sendPack.Serialize()
+		wn, err := context.ChannelConn.Write(sendBytes)
+
+		if err != nil || wn != len(sendBytes) {
+			break
+		}
+	}
+
+	context.CloseCond <- struct{}{}
+}
+
+func DispatchToSession(context *Context, channelPack *ChannelPack) {
+	session := context.ConnectSessionDict.Find(channelPack.Head.Id)
+	if session == nil {
+		var cmd string
+		if len(channelPack.Body) < 20 {
+			cmd = string(channelPack.Body)
+		}
+		log.Printf("can't find session id:%v cmd:%v body:%v", channelPack.Head.Id, channelPack.Head.IsCmd(), cmd)
+
+	} else {
+		if channelPack.Head.IsCmd() && channelPack.Body.IsAck() {
+			session.AckQueue.Put(channelPack)
+		} else {
+			session.SendQueue.Put(channelPack)
+		}
+	}
 }
