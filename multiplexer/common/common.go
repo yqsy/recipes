@@ -174,7 +174,7 @@ func (sessionDict *SessionDict) FinAll() {
 	sessionDict.mtx.Lock()
 	defer sessionDict.mtx.Unlock()
 
-	for _, session := range (sessionDict.ConnectSessionDict) {
+	for _, session := range sessionDict.ConnectSessionDict {
 		finPack := NewFinPack(session.Id)
 		session.SendQueue.Put(finPack)
 		session.SendWaterMask.DropMaskTo(0)

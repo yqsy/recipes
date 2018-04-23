@@ -40,7 +40,7 @@ func serveSession(context *common.Context, session *common.Session) {
 	recvPack := session.SendQueue.Take().(*common.ChannelPack)
 
 	if !recvPack.Head.IsCmd() || !recvPack.Body.IsSynOK() {
-		log.Printf("[%v]session SYN error remote:", session.Id)
+		log.Printf("[%v]session SYN error", session.Id)
 		return
 	}
 
@@ -63,9 +63,12 @@ func serveSession(context *common.Context, session *common.Session) {
 				}
 			}
 
-			session.Conn.Write(recvPack.Body)
+			wn, err := session.Conn.Write(recvPack.Body)
+			if err != nil || wn != len(recvPack.Body) {
+				break
+			}
 
-			session.RecvWaterMask += uint32(len(recvPack.Body))
+			session.RecvWaterMask += uint32(wn)
 			if session.RecvWaterMask > common.ResumeWaterMask {
 				ackPack := common.NewAckPack(session.Id, session.RecvWaterMask)
 				context.SendQueue.Put(ackPack)

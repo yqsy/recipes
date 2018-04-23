@@ -36,7 +36,10 @@ func serverSession(context *common.Context, session *common.Session) {
 				}
 			}
 
-			session.Conn.Write(recvPack.Body)
+			wn, err := session.Conn.Write(recvPack.Body)
+			if err != nil || wn != len(recvPack.Body) {
+				break
+			}
 
 			session.RecvWaterMask += uint32(len(recvPack.Body))
 			if session.RecvWaterMask > common.ResumeWaterMask {
