@@ -12,7 +12,7 @@ import (
 
 var usage = `Usage:
 %v -L :5000:localhost:5001 dmux_ip:dmux_port
-%v -R :5000:localhost:5001 dmux_ip:dmux_port
+%v -R localhost:5001::5000 dmux_ip:dmux_port
 
 -L: local listen and connect to remote in channel
 -R: remote listen and connect to local in channel`
