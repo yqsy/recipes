@@ -36,11 +36,7 @@ func serverSession(context *common.Context, session *common.Session) {
 				}
 			}
 
-			wn, err := session.Conn.Write(recvPack.Body)
-			if err != nil || wn != len(recvPack.Body) {
-				break
-			}
-
+			session.Conn.Write(recvPack.Body)
 			session.RecvWaterMask += uint32(len(recvPack.Body))
 			if session.RecvWaterMask > common.ResumeWaterMask {
 				ackPack := common.NewAckPack(session.Id, session.RecvWaterMask)
