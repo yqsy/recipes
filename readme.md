@@ -29,7 +29,7 @@
 * [multiplexer(N:1 and 1:n)](multiplexer/readme.md)
 * [through-net(中继内网穿透)](multiplexer/readme.md)
 * [transparent-proxy(透明代理)]()
-* [tls-tun]()
+* [tls-tun](tls-tun/readme.md)
 
 <a id="markdown-22-echo-类型" name="22-echo-类型"></a>
 ## 2.2. echo 类型
