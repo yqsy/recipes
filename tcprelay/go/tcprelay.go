@@ -147,7 +147,7 @@ func Relay(config *Config, context *Context) {
 
 			if config.IsLocalReadlLimit() {
 				canReadBytes := context.readLocalWaterMask.WaitCanReadBytes()
-				buf = make([]byte, canReadBytes)
+				buf = fixedBuffer[:canReadBytes]
 			} else {
 				buf = fixedBuffer
 			}
@@ -181,7 +181,7 @@ func Relay(config *Config, context *Context) {
 
 			if config.IsRemoteReadlLimit() {
 				canReadBytes := context.readRemoteWaterMask.WaitCanReadBytes()
-				buf = make([]byte, canReadBytes)
+				buf = fixedBuffer[:canReadBytes]
 			} else {
 				buf = fixedBuffer
 			}
