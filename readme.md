@@ -41,7 +41,7 @@
 * [daytime]()
 * [discard](discard)
 * [ttcp](ttcp/readme.md)
-* [simplehttp](simplehttp)
+* [simplehttp(s)](simplehttp)
 
 <a id="markdown-23-chat类型" name="23-chat类型"></a>
 ## 2.3. chat类型
