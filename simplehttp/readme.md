@@ -20,5 +20,5 @@ openssl req -new -x509 -days 365 -key fd.key -out fd.crt \
 -subj "/C=GB/L=London/O=Feisty Duck Ltd/CN=www.example.com"
 
 # 启动simplehttps
-go run simplehttps.go :8080
+sudo go run simplehttps.go :443
 ```

@@ -193,3 +193,5 @@ venv.bak/
 # End of https://www.gitignore.io/api/jetbrains+all
 tls-tun/server/fd.crt
 tls-tun/server/fd.key
+simplehttp/simplehttps/fd.crt
+simplehttp/simplehttps/fd.key
