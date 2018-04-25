@@ -195,3 +195,5 @@ tls-tun/server/fd.crt
 tls-tun/server/fd.key
 simplehttp/simplehttps/fd.crt
 simplehttp/simplehttps/fd.key
+tls-tun/netcat/fd.crt
+tls-tun/netcat/fd.key
