@@ -106,11 +106,18 @@ func NewContext() *Context {
 func AddMaskPerSecond(waterMask *WaterMask, limitPerSecond uint64, stopCount chan struct{}) {
 	ticket := time.NewTicker(time.Second)
 
+	quit := false
+
 	for {
 		select {
 		case <-ticket.C:
 			waterMask.AddMask(limitPerSecond)
 		case <-stopCount:
+			quit = true
+			break
+		}
+
+		if quit {
 			break
 		}
 	}
@@ -218,8 +225,8 @@ func ReadConfig(config *Config) bool {
 	config.remoteAddr = flag.String("RemoteAddr", "", "remote connect addr")
 	config.readLocalReverse = flag.Bool("readLocalReverse", false, "random 1 bit Reverse")
 	config.readRemoteReverse = flag.Bool("readRemoteReverse", false, "random 1 bit Reverse")
-	readLocalLimitStr := flag.String("readLocalLimit", "", "N[T,G,M,K,B] per second")
-	readRemoteLimitStr := flag.String("readRemoteLimit", "", "N[T,G,M,K,B] per second")
+	readLocalLimitStr := flag.String("readLocalLimit", "", "N[T,G,M,K,B] per second (1024hex)")
+	readRemoteLimitStr := flag.String("readRemoteLimit", "", "N[T,G,M,K,B] per second (1024hex)")
 	flag.Parse()
 
 	if *config.listenAddr == "" || *config.remoteAddr == "" {
