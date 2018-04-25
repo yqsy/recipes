@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"code.cloudfoundry.org/bytefmt"
+	"math/rand"
 )
 
 const (
@@ -36,6 +37,22 @@ func (config *Config) IsRemoteReadlLimit() bool {
 		return false
 	} else {
 		return true
+	}
+}
+
+func (config *Config) IsReverseLocal() bool {
+	if *config.readLocalReverse {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (config *Config) IsReverseRemote() bool {
+	if *config.readRemoteReverse {
+		return true
+	} else {
+		return false
 	}
 }
 
@@ -91,6 +108,9 @@ type Context struct {
 	// localConn -> proxy -> remoteConn
 	// localConn <- proxy <- remoteConn
 	closeDone chan struct{}
+
+	// 反转1bit时所用
+	rand *rand.Rand
 }
 
 func NewContext() *Context {
@@ -100,6 +120,7 @@ func NewContext() *Context {
 	context.readRemoteWaterMask = NewWaterMask()
 	context.stopReadRemoteCount = make(chan struct{}, 1)
 	context.closeDone = make(chan struct{}, 2)
+	context.rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 	return context
 }
 
@@ -123,6 +144,22 @@ func AddMaskPerSecond(waterMask *WaterMask, limitPerSecond uint64, stopCount cha
 	}
 	log.Printf("ticker stop")
 }
+
+func Reserve1Bit(n byte, pos uint32) byte {
+	if pos > 7 {
+		return 0
+	}
+	m := byte(1 << pos)
+	m &= n
+	if m == 0 {
+		n |= byte(1 << pos)
+		return n
+	} else {
+		n &= ^(1 << pos)
+		return n
+	}
+}
+
 func Relay(config *Config, context *Context) {
 	defer context.localConn.Close()
 
@@ -165,6 +202,11 @@ func Relay(config *Config, context *Context) {
 				break
 			}
 
+			if config.IsReverseLocal() {
+				bytePos := context.rand.Intn(rn)
+				buf[bytePos] = Reserve1Bit(buf[bytePos], uint32(context.rand.Intn(8)))
+			}
+
 			wn, err := context.remoteConn.Write(buf[:rn])
 			_ = wn
 			if err != nil {
@@ -197,6 +239,11 @@ func Relay(config *Config, context *Context) {
 
 			if err != nil {
 				break
+			}
+
+			if config.IsReverseRemote() {
+				bytePos := context.rand.Intn(rn)
+				buf[bytePos] = Reserve1Bit(buf[bytePos], uint32(context.rand.Intn(8)))
 			}
 
 			wn, err := context.localConn.Write(buf[:rn])
