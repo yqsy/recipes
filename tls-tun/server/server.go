@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"log"
 )
 
 func handleConn(conn net.Conn) {
@@ -16,20 +17,24 @@ func handleConn(conn net.Conn) {
 	for {
 		line, err := bufReader.ReadString('\n')
 		if err != nil {
+			log.Println(err)
 			break
 		}
 
-		fmt.Print(line)
+		log.Print(line)
 
 		wn, err := conn.Write([]byte("world\n"))
 		_ = wn
 		if err != nil {
+			log.Println(err)
 			break
 		}
 	}
 }
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	arg := os.Args
 
 	if len(arg) < 2 {

@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"os"
 	"bufio"
+	"log"
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	arg := os.Args
 
 	if len(arg) < 2 {
@@ -27,6 +30,7 @@ func main() {
 	wn, err := conn.Write([]byte("hello\n"))
 	_ = wn
 	if err != nil {
+		log.Println(err)
 		return
 	}
 
@@ -34,8 +38,9 @@ func main() {
 
 	line, err := bufReader.ReadString('\n')
 	if err != nil {
+		log.Println(err)
 		return
 	}
 
-	fmt.Print(line)
+	log.Print(line)
 }
