@@ -23,11 +23,10 @@ type Socks4Req struct {
 }
 
 func (socks4Req *Socks4Req) getIP() string {
-	return fmt.Sprintf("%v.%v.%v.%v",
-		socks4Req.Ipv4Addr[0],
+	return net.IPv4(socks4Req.Ipv4Addr[0],
 		socks4Req.Ipv4Addr[1],
 		socks4Req.Ipv4Addr[2],
-		socks4Req.Ipv4Addr[3])
+		socks4Req.Ipv4Addr[3]).String()
 }
 
 func (socks4Req *Socks4Req) getPort() string {
