@@ -1,4 +1,4 @@
-package main
+package socks5
 
 import (
 	"testing"
@@ -18,7 +18,9 @@ func simpleEcho() {
 	defer listener.Close()
 	for {
 		conn, err := listener.Accept()
-		panicOnError(err)
+		if err != nil {
+			panic(err)
+		}
 
 		go func(conn net.Conn) {
 			defer conn.Close()

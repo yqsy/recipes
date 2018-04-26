@@ -1,4 +1,4 @@
-package main
+package socks4
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"log"
 	"encoding/binary"
 	"bufio"
+	"github.com/yqsy/recipes/socks/common"
 )
 
 type Socks4Req struct {
@@ -22,25 +23,25 @@ type Socks4Req struct {
 	// Domain terminated with a null
 }
 
-func (socks4Req *Socks4Req) getIP() string {
+func (socks4Req *Socks4Req) GetIP() string {
 	return net.IPv4(socks4Req.Ipv4Addr[0],
 		socks4Req.Ipv4Addr[1],
 		socks4Req.Ipv4Addr[2],
 		socks4Req.Ipv4Addr[3]).String()
 }
 
-func (socks4Req *Socks4Req) getPort() string {
+func (socks4Req *Socks4Req) GetPort() string {
 	return fmt.Sprintf("%v", socks4Req.Port)
 }
 
-func (socks4Req *Socks4Req) isSocks4a() bool {
+func (socks4Req *Socks4Req) IsSocks4a() bool {
 	return socks4Req.Ipv4Addr[0] == 0 &&
 		socks4Req.Ipv4Addr[1] == 0 &&
 		socks4Req.Ipv4Addr[2] == 0 &&
 		socks4Req.Ipv4Addr[3] != 0
 }
 
-func (socks4Req *Socks4Req) checkLegal(remoteAddr net.Addr) bool {
+func (socks4Req *Socks4Req) CheckLegal(remoteAddr net.Addr) bool {
 	// must be 0x04 for this version
 	if socks4Req.Version != 0x04 {
 		log.Printf("illegal Version: %v from: %v\n", socks4Req.Version, remoteAddr)
@@ -66,7 +67,7 @@ type Socks4Res struct {
 	Ipv4Addr [4]byte
 }
 
-func socks4Handle(localConn net.Conn, bufReader *bufio.Reader) {
+func Socks4Handle(localConn net.Conn, bufReader *bufio.Reader) {
 
 	var socks4Req Socks4Req
 
@@ -76,7 +77,7 @@ func socks4Handle(localConn net.Conn, bufReader *bufio.Reader) {
 		return
 	}
 
-	if !socks4Req.checkLegal(localConn.RemoteAddr()) {
+	if !socks4Req.CheckLegal(localConn.RemoteAddr()) {
 		return
 	}
 
@@ -90,14 +91,14 @@ func socks4Handle(localConn net.Conn, bufReader *bufio.Reader) {
 
 	var remoteAddr string
 
-	if socks4Req.isSocks4a() {
+	if socks4Req.IsSocks4a() {
 		domainBytes, err := bufReader.ReadSlice(0)
 		if err != nil {
 			return
 		}
-		remoteAddr = string(domainBytes[:len(domainBytes)-1]) + ":" + socks4Req.getPort()
+		remoteAddr = string(domainBytes[:len(domainBytes)-1]) + ":" + socks4Req.GetPort()
 	} else {
-		remoteAddr = socks4Req.getIP() + ":" + socks4Req.getPort()
+		remoteAddr = socks4Req.GetIP() + ":" + socks4Req.GetPort()
 	}
 
 	remoteConn, err := net.Dial("tcp", remoteAddr)
@@ -120,5 +121,5 @@ func socks4Handle(localConn net.Conn, bufReader *bufio.Reader) {
 		return
 	}
 
-	relayTcpUntilDie(localConn, remoteAddr, remoteConn, bufReader)
+	common.RelayTcpUntilDie(localConn, remoteAddr, remoteConn, bufReader)
 }

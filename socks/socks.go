@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"bufio"
+	"github.com/yqsy/recipes/socks/socks4"
+	"github.com/yqsy/recipes/socks/socks5"
 )
 
 func dispatch(localConn net.Conn) {
@@ -17,9 +19,9 @@ func dispatch(localConn net.Conn) {
 	}
 
 	if firstByte[0] == 0x04 {
-		socks4Handle(localConn, bufReader)
+		socks4.Socks4Handle(localConn, bufReader)
 	} else if firstByte[0] == 0x05 {
-		socks5Handle(localConn, bufReader)
+		socks5.Socks5Handle(localConn, bufReader)
 	}
 }
 
@@ -31,7 +33,9 @@ func main() {
 	}
 
 	listener, err := net.Listen("tcp", arg[1])
-	panicOnError(err)
+	if err != nil {
+		panic(err)
+	}
 
 	defer listener.Close()
 

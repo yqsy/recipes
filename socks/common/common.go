@@ -1,4 +1,4 @@
-package main
+package common
 
 import (
 	"net"
@@ -7,13 +7,7 @@ import (
 	"bufio"
 )
 
-func panicOnError(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-func relayTcpUntilDie(localConn net.Conn, remoteAddr string, remoteConn net.Conn, bufReader *bufio.Reader) {
+func RelayTcpUntilDie(localConn net.Conn, remoteAddr string, remoteConn net.Conn, bufReader *bufio.Reader) {
 	log.Printf("relay: %v <-> %v\n", localConn.RemoteAddr(), remoteAddr)
 	done := make(chan bool, 2)
 

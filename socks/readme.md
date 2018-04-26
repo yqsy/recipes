@@ -89,8 +89,7 @@ nc --proxy-type socks4 --proxy 127.0.0.1:1080 127.0.0.1 5003
 ## 3.3. 命令
 
 ```bash
-go run common.go socks4.go socks5.go socks.go :1080
-
-go test common.go socks4.go socks5.go socks4_test.go 
-go test common.go socks4.go socks5.go socks5_test.go 
+go run socks.go :1080
+go test socks4.go socks4_test.go
+go test socks5.go socks5_test.go
 ```

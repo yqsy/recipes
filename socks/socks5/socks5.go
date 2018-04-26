@@ -1,4 +1,4 @@
-package main
+package socks5
 
 import (
 	"net"
@@ -6,6 +6,7 @@ import (
 	"log"
 	"fmt"
 	"bufio"
+	"github.com/yqsy/recipes/socks/common"
 )
 
 type Socks5GreetingReq struct {
@@ -21,7 +22,7 @@ type Socks5GreetingReq struct {
 	// AuthMethod // 1 byte per method supported
 }
 
-func (socks5GreetingReq *Socks5GreetingReq) checkLegal(remoteAddr net.Addr) bool {
+func (socks5GreetingReq *Socks5GreetingReq) CheckLegal(remoteAddr net.Addr) bool {
 	if socks5GreetingReq.Version != 0x05 {
 		log.Printf("illegal Version: %v from: %v\n",
 			socks5GreetingReq.Version, remoteAddr)
@@ -64,7 +65,7 @@ type Socks5Req struct {
 	// Port
 }
 
-func (socks5Req *Socks5Req) checkLegal(remoteAddr net.Addr) bool {
+func (socks5Req *Socks5Req) CheckLegal(remoteAddr net.Addr) bool {
 	if socks5Req.Version != 0x05 {
 		log.Printf("illegal Version: %v from: %v\n",
 			socks5Req.Version, remoteAddr)
@@ -86,7 +87,7 @@ func (socks5Req *Socks5Req) checkLegal(remoteAddr net.Addr) bool {
 	return true
 }
 
-func (socks5Req *Socks5Req) isAddrDomain() bool {
+func (socks5Req *Socks5Req) IsAddrDomain() bool {
 	return socks5Req.AddressType == 0x03
 }
 
@@ -119,7 +120,7 @@ type Socks5Res struct {
 	Port uint16
 }
 
-func socks5Handle(localConn net.Conn, bufReader *bufio.Reader) {
+func Socks5Handle(localConn net.Conn, bufReader *bufio.Reader) {
 
 	var socks5GreetingReq Socks5GreetingReq
 
@@ -129,7 +130,7 @@ func socks5Handle(localConn net.Conn, bufReader *bufio.Reader) {
 		return
 	}
 
-	if !socks5GreetingReq.checkLegal(localConn.RemoteAddr()) {
+	if !socks5GreetingReq.CheckLegal(localConn.RemoteAddr()) {
 		return
 	}
 
@@ -161,20 +162,20 @@ func socks5Handle(localConn net.Conn, bufReader *bufio.Reader) {
 		return
 	}
 
-	if !socks5Req.checkLegal(localConn.RemoteAddr()) {
+	if !socks5Req.CheckLegal(localConn.RemoteAddr()) {
 		return
 	}
 
 	var remoteAddr string
 
-	if socks5Req.isAddrDomain() {
-		remoteAddr, err = parseDomainAddr(bufReader)
+	if socks5Req.IsAddrDomain() {
+		remoteAddr, err = ParseDomainAddr(bufReader)
 		if err != nil {
 			return
 		}
 
 	} else {
-		remoteAddr, err = parseIpAddr(&socks5Req, bufReader)
+		remoteAddr, err = ParseIpAddr(&socks5Req, bufReader)
 		if err != nil {
 			return
 		}
@@ -200,10 +201,10 @@ func socks5Handle(localConn net.Conn, bufReader *bufio.Reader) {
 	if err != nil {
 		return
 	}
-	relayTcpUntilDie(localConn, remoteAddr, remoteConn, bufReader)
+	common.RelayTcpUntilDie(localConn, remoteAddr, remoteConn, bufReader)
 }
 
-func parseDomainAddr(bufReader *bufio.Reader) (string, error) {
+func ParseDomainAddr(bufReader *bufio.Reader) (string, error) {
 	var domainLen byte
 	err := binary.Read(bufReader, binary.BigEndian, &domainLen)
 	if err != nil {
@@ -226,7 +227,7 @@ func parseDomainAddr(bufReader *bufio.Reader) (string, error) {
 	return remoteAddr, nil
 }
 
-func parseIpAddr(socks5Req *Socks5Req, bufReader *bufio.Reader) (string, error) {
+func ParseIpAddr(socks5Req *Socks5Req, bufReader *bufio.Reader) (string, error) {
 
 	addressLen := 0
 	// IPv4 address
