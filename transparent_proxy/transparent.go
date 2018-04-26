@@ -121,6 +121,7 @@ func (ctx *Context) GetIpv4Str() string {
 }
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	arg := os.Args
 
