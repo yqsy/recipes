@@ -21,15 +21,16 @@
 <a id="markdown-21-proxy类型" name="21-proxy类型"></a>
 ## 2.1. proxy类型
 
-* [http(s)proxy](httpproxy/readme.md)
 * [socks(4|4a|5)proxy](socks/readme.md)
+* [http(s)proxy](httpproxy/readme.md)
+* [proxy_all(proxy集合)](proxy_all/readme.md)
 * [tcprelay(代理/慢速/1bit反转)](tcprelay/readme.md)
 * [netcat](netcat/readme.md)
 * [slowrecv(多路汇聚慢速收)](slowrecv/readme.md)
 * [multiplexer(N:1 and 1:n)](multiplexer/readme.md)
-* [through-net(中继内网穿透)](multiplexer/readme.md)
-* [tls-tun/tls-netcat](tls-tun/readme.md)
-* [transparent-proxy(透明代理)](transparent-proxy/readme.md)
+* [through_net(中继内网穿透)](multiplexer/readme.md)
+* [tls_tun/tls_netcat](tls_tun/readme.md)
+* [transparent_proxy(透明代理)](transparent_proxy/readme.md)
 
 <a id="markdown-22-echo-类型" name="22-echo-类型"></a>
 ## 2.2. echo 类型
@@ -52,7 +53,7 @@
 <a id="markdown-24-其他" name="24-其他"></a>
 ## 2.4. 其他
 
-* [incomplete-send(tcp发送数据不完整例子)](incomplete-send/readme.md)
+* [incomplete_send(tcp发送数据不完整例子)](incomplete_send/readme.md)
 * [file-transfer(文件传输)]()
 * [connection-pool(连接池)]()
 * [identity-verification(通道身份验证)]()
