@@ -8,6 +8,7 @@ import (
 	"github.com/yqsy/recipes/socks/socks4"
 	"github.com/yqsy/recipes/socks/socks5"
 	"github.com/yqsy/recipes/httpproxy/httpproxy"
+	"log"
 )
 
 const (
@@ -47,6 +48,8 @@ func dispatch(localConn net.Conn) {
 }
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	arg := os.Args
 	if len(arg) < 2 {
 		fmt.Printf("Usage:\n %v listenaddr\nExample:\n %v :1080\n", arg[0], arg[0])
