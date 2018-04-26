@@ -8,10 +8,16 @@ import (
 	"github.com/yqsy/recipes/httpproxy/httpproxy"
 )
 
+const (
+	MaxRead = 4096
+)
+
 func dispatch(localConn net.Conn) {
 	defer localConn.Close()
 
-	bufReader := bufio.NewReader(localConn)
+	limitReader := httpproxy.NewLimitReader(localConn, MaxRead)
+
+	bufReader := bufio.NewReader(limitReader)
 	bytes, err := bufReader.Peek(7)
 
 	if err != nil {
@@ -20,10 +26,10 @@ func dispatch(localConn net.Conn) {
 
 	if string(bytes) == "CONNECT" {
 		// https proxy
-		httpproxy.HttpsProxyHandle(localConn, bufReader)
+		httpproxy.HttpsProxyHandle(localConn, bufReader, limitReader)
 	} else {
 		// http proxy
-		httpproxy.HttpProxyHandle(localConn, bufReader)
+		httpproxy.HttpProxyHandle(localConn, bufReader, limitReader)
 	}
 }
 

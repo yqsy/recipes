@@ -10,7 +10,48 @@ import (
 	"net/url"
 	"net/textproto"
 	"net/http"
+	"github.com/pkg/errors"
 )
+
+// textproto.ReadLine -> textproto.readLineSlice(缓冲区无限append) -> bufio.ReadLine(填塞固定缓冲区,返回more bool) -> bufio.ReadSlice(自带固定缓冲区,defaultBufSize = 4096) -> read
+type LimitReader struct {
+	limit     uint64
+	rd        io.Reader
+	limitFlag bool
+}
+
+func NewLimitReader(reader io.Reader, limit uint64) *LimitReader {
+	lr := &LimitReader{}
+	lr.limit = limit
+	lr.rd = reader
+	lr.limitFlag = true
+	return lr
+}
+
+func min(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func (lr *LimitReader) Read(p []byte) (n int, err error) {
+	if lr.limitFlag {
+		if lr.limit == 0 {
+			return 0, errors.New("limit")
+		}
+		limitBytes := min(uint64(len(p)), lr.limit)
+		rn, err := lr.rd.Read(p[:limitBytes])
+		lr.limit -= uint64(rn)
+		return rn, err
+	} else {
+		return lr.rd.Read(p)
+	}
+}
+
+func (lr *LimitReader) SetNoLimit() {
+	lr.limitFlag = false
+}
 
 // parseRequestLine parses "GET /foo HTTP/1.1" into its three parts.
 func ParseRequestLine(line string) (method, requestURL, proto string, ok bool) {
@@ -48,7 +89,7 @@ func RelayTcpUntilDie(localConn net.Conn, remoteAddr string, remoteConn net.Conn
 	}
 }
 
-func HttpProxyHandle(localConn net.Conn, bufReader *bufio.Reader) {
+func HttpProxyHandle(localConn net.Conn, bufReader *bufio.Reader, lr *LimitReader) {
 	tp := textproto.NewReader(bufReader)
 
 	line, err := tp.ReadLine()
@@ -97,10 +138,12 @@ func HttpProxyHandle(localConn net.Conn, bufReader *bufio.Reader) {
 	remoteConn.Write([]byte(line + "\r\n"))
 	header.WriteSubset(remoteConn, nil)
 	remoteConn.Write([]byte("\r\n"))
+
+	lr.SetNoLimit()
 	RelayTcpUntilDie(localConn, URL.Host, remoteConn, bufReader)
 }
 
-func HttpsProxyHandle(localConn net.Conn, bufReader *bufio.Reader) {
+func HttpsProxyHandle(localConn net.Conn, bufReader *bufio.Reader, lr *LimitReader) {
 	tp := textproto.NewReader(bufReader)
 
 	line, err := tp.ReadLine()
@@ -138,5 +181,6 @@ func HttpsProxyHandle(localConn net.Conn, bufReader *bufio.Reader) {
 
 	fmt.Fprintf(localConn, "%v 200 Connection established\r\n\r\n", protocol)
 
+	lr.SetNoLimit()
 	RelayTcpUntilDie(localConn, URL.Host, remoteConn, bufReader)
 }
