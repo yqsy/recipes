@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"net/textproto"
 	"net/http"
-	"github.com/pkg/errors"
+	"errors"
 )
 
 // textproto.ReadLine -> textproto.readLineSlice(缓冲区无限append) -> bufio.ReadLine(填塞固定缓冲区,返回more bool) -> bufio.ReadSlice(自带固定缓冲区,defaultBufSize = 4096) -> read
