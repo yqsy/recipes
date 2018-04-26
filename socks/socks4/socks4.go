@@ -67,6 +67,14 @@ type Socks4Res struct {
 	Ipv4Addr [4]byte
 }
 
+func (socks4Res *Socks4Res) IsSuccess() bool {
+	if socks4Res.NullByte != 0x00 || socks4Res.States != 0x5A {
+		return false
+	} else {
+		return true
+	}
+}
+
 func Socks4Handle(localConn net.Conn, bufReader *bufio.Reader) {
 
 	var socks4Req Socks4Req
