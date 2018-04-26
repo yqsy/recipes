@@ -6,6 +6,7 @@ import (
 	"net"
 	"syscall"
 	"encoding/binary"
+	"log"
 )
 
 var usage = `Usage:
@@ -33,7 +34,11 @@ func serve(conn net.Conn) {
 
 	port := binary.BigEndian.Uint16([]byte{addr.Multiaddr[2], addr.Multiaddr[3]})
 
-	fmt.Println(ipv4, port)
+	log.Printf("dst: %v:%v", ipv4, port)
+
+}
+
+type Context struct {
 }
 
 func main() {

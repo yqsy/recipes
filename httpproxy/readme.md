@@ -85,6 +85,14 @@ curl -v http://baidu.com
 错误:
 * 第一行长度攻击 (暂时没有,go的http解析模块暂时是无限制增长的)
 
+
+命令
+```
+go run httpproxy.go :1080
+
+go test httpproxy.go httpproxy_test.go
+```
+
 <a id="markdown-4-吞吐量测试" name="4-吞吐量测试"></a>
 # 4. 吞吐量测试
 
