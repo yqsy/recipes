@@ -4,6 +4,8 @@ import (
 	"os"
 	"fmt"
 	"net"
+	"syscall"
+	"encoding/binary"
 )
 
 var usage = `Usage:
@@ -12,9 +14,26 @@ var usage = `Usage:
 const SO_ORIGINAL_DST = 80
 
 func serve(conn net.Conn) {
+
 	defer conn.Close()
 
-	fmt.Println(conn.RemoteAddr())
+	file, err := conn.(*net.TCPConn).File()
+	if err != nil {
+		return
+	}
+
+	fd := int(file.Fd())
+
+	addr, err := syscall.GetsockoptIPv6Mreq(fd, syscall.IPPROTO_IP, SO_ORIGINAL_DST)
+
+	ipv4 := net.IPv4(addr.Multiaddr[4],
+		addr.Multiaddr[5],
+		addr.Multiaddr[6],
+		addr.Multiaddr[7]).String()
+
+	port := binary.BigEndian.Uint16([]byte{addr.Multiaddr[2], addr.Multiaddr[3]})
+
+	fmt.Println(ipv4, port)
 }
 
 func main() {
