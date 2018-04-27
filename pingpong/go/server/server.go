@@ -4,22 +4,49 @@ import (
 	"os"
 	"fmt"
 	"net"
+	"strconv"
 )
 
 var usage = `Usage:
-%v listenAddr`
+%v listenAddr bufSize`
 
+type Context struct {
+	bufSize int
+	buf     []byte
+	conn    net.Conn
+}
 
-func serve(conn net.Conn) {
-	defer conn.Close()
+func serve(ctx *Context) {
+	defer ctx.conn.Close()
 
+	for {
+		rn, err := ctx.conn.Read(ctx.buf)
+		if err != nil {
+			return
+		}
+
+		wn, err := ctx.conn.Write(ctx.buf[:rn])
+		if err != nil {
+			return
+		}
+
+		_ = wn
+	}
 }
 
 func main() {
 	arg := os.Args
 
-	if len(arg) < 2 {
-		fmt.Printf(usage, arg[0])
+	usage = fmt.Sprintf(usage, arg[0])
+
+	if len(arg) < 3 {
+		fmt.Printf(usage)
+		return
+	}
+
+	bufSize, err := strconv.Atoi(arg[2])
+	if err != nil {
+		fmt.Printf(usage)
 		return
 	}
 
@@ -31,10 +58,11 @@ func main() {
 	defer listener.Close()
 
 	for {
-		conn, err := listener.Accept()
+		ctx := &Context{bufSize: bufSize, buf: make([]byte, bufSize)}
+		ctx.conn, err = listener.Accept()
 		if err != nil {
 			panic(err)
 		}
-		go serve(conn)
+		go serve(ctx)
 	}
 }
