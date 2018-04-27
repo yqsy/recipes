@@ -61,28 +61,34 @@ chmod +x ipset.sh && sudo ./ipset.sh
 sudo mkdir -p /etc/sysconfig
 sudo ipset -S  | sudo tee /etc/sysconfig/ipset.cidr_cn
 sudo touch /etc/rc.local
+sudo chmod +x /etc/rc.local
 rm cidr_cn ipset.sh
 
 sudo bash -c 'cat >> /etc/rc.local' << EOF
 #!/bin/bash
 # rc.local config file created by use
-ipset restore < /etc/sysconfig/ipset.cidr_cn
-exit 0
-EOF
 
-sudo iptables -t nat -N SOCKS
-sudo iptables -t nat -A SOCKS -d 0.0.0.0/8 -j RETURN
-sudo iptables -t nat -A SOCKS -d 10.0.0.0/8 -j RETURN
-sudo iptables -t nat -A SOCKS -d 127.0.0.0/8 -j RETURN
-sudo iptables -t nat -A SOCKS -d 169.254.0.0/16 -j RETURN
-sudo iptables -t nat -A SOCKS -d 172.16.0.0/12 -j RETURN
-sudo iptables -t nat -A SOCKS -d 192.168.0.0/16 -j RETURN
-sudo iptables -t nat -A SOCKS -d 224.0.0.0/4 -j RETURN
-sudo iptables -t nat -A SOCKS -d 240.0.0.0/4 -j RETURN
-sudo iptables -t nat -A SOCKS -d 202.144.194.10 -j RETURN
-sudo iptables -t nat -A SOCKS -m set --match-set cidr_cn dst -j RETURN
-sudo iptables -t nat -A SOCKS -p tcp -j REDIRECT --to-ports 20018
-sudo iptables -t nat -A OUTPUT -p tcp -j SOCKS
-sudo iptables -t nat -A PREROUTING -p tcp -j SOCKS
+/usr/bin/client_linux_amd64 -l :1080 -r dgc1:4002 --mode fast2 -crypt aes --key 密码 > /dev/null 2>&1
+
+/usr/bin/transparent :20018 localhost:1080 > /dev/null 2>&1
+
+ipset restore < /etc/sysconfig/ipset.cidr_cn
+
+iptables -t nat -N SOCKS
+iptables -t nat -A SOCKS -d 0.0.0.0/8 -j RETURN
+iptables -t nat -A SOCKS -d 10.0.0.0/8 -j RETURN
+iptables -t nat -A SOCKS -d 127.0.0.0/8 -j RETURN
+iptables -t nat -A SOCKS -d 169.254.0.0/16 -j RETURN
+iptables -t nat -A SOCKS -d 172.16.0.0/12 -j RETURN
+iptables -t nat -A SOCKS -d 192.168.0.0/16 -j RETURN
+iptables -t nat -A SOCKS -d 224.0.0.0/4 -j RETURN
+iptables -t nat -A SOCKS -d 240.0.0.0/4 -j RETURN
+iptables -t nat -A SOCKS -d 202.144.194.10 -j RETURN
+iptables -t nat -A SOCKS -m set --match-set cidr_cn dst -j RETURN
+iptables -t nat -A SOCKS -p tcp -j REDIRECT --to-ports 20018
+iptables -t nat -A OUTPUT -p tcp -j SOCKS
+iptables -t nat -A PREROUTING -p tcp -j SOCKS
+
+exit 0
 
 ```
