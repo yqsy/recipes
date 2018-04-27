@@ -59,8 +59,7 @@
 * [hub]()
 * [pub-sub]()
 
-<a id="markdown-32-其他" name="32-其他"
-></a>
+
 <a id="markdown-32-其他" name="32-其他"></a>
 ## 3.2. 其他
 
