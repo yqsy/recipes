@@ -1,6 +1,6 @@
 #include <iostream>
 #include <boost/lockfree/queue.hpp>
-
+#include <atomic>
 
 #include <chrono>
 #include <thread>
@@ -19,18 +19,23 @@ int main() {
         }
     });
 
-    for (int i = 0; i < SwitchTimes; ++i) {
-        int j;
-        queue.pop(j);
+    int consumer = 0;
+
+    while (consumer < SwitchTimes) {
+        int value;
+        while (queue.pop(value)) {
+            consumer++;
+        }
     }
+
 
     thr.join();
 
     auto t2 = std::chrono::high_resolution_clock::now();
 
-    std::chrono::duration<double, std::milli> fp_ms = t2 - t1;
+    std::chrono::duration<double, std::milli> fpMs = t2 - t1;
 
-    auto elapsed = fp_ms.count();
+    auto elapsed = fpMs.count();
     std::printf("SwitchTimes:%d took:%fms speed:%.2f/s\n", SwitchTimes, elapsed,
                 double(SwitchTimes) / double(elapsed / 1000));
 
