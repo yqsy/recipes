@@ -4,9 +4,10 @@
 - [2. 网络部分](#2-网络部分)
     - [2.1. proxy类型](#21-proxy类型)
     - [2.2. echo 类型](#22-echo-类型)
-    - [2.3. chat类型](#23-chat类型)
-    - [2.4. 其他](#24-其他)
-- [3. 底层部分](#3-底层部分)
+- [3. 测吞吐](#3-测吞吐)
+    - [3.1. chat类型](#31-chat类型)
+    - [3.2. 其他](#32-其他)
+- [4. 底层部分](#4-底层部分)
 
 <!-- /TOC -->
 
@@ -35,7 +36,6 @@
 <a id="markdown-22-echo-类型" name="22-echo-类型"></a>
 ## 2.2. echo 类型
 
-* [pingpong](pingpong)
 * [echo](echo)
 * [chargen]()
 * [time]()
@@ -44,14 +44,25 @@
 * [ttcp](ttcp/readme.md)
 * [simplehttp(s)](simplehttp)
 
-<a id="markdown-23-chat类型" name="23-chat类型"></a>
-## 2.3. chat类型
+<a id="markdown-3-测吞吐" name="3-测吞吐"></a>
+# 3. 测吞吐
+
+* [pingpong](pingpong/readme.md)
+* [pass_flower(击鼓传花)](pass_flower)
+* [nginx](nginx)
+* [zeromq](zeromq)
+
+
+<a id="markdown-31-chat类型" name="31-chat类型"></a>
+## 3.1. chat类型
 
 * [hub]()
 * [pub-sub]()
 
-<a id="markdown-24-其他" name="24-其他"></a>
-## 2.4. 其他
+<a id="markdown-32-其他" name="32-其他"
+></a>
+<a id="markdown-32-其他" name="32-其他"></a>
+## 3.2. 其他
 
 * [incomplete_send(tcp发送数据不完整例子)](incomplete_send/readme.md)
 * [file-transfer(文件传输)]()
@@ -67,8 +78,8 @@
 * [N皇后]()
 * [多机求解中位数]()
 
-<a id="markdown-3-底层部分" name="3-底层部分"></a>
-# 3. 底层部分
+<a id="markdown-4-底层部分" name="4-底层部分"></a>
+# 4. 底层部分
 
 * [自旋锁/读写锁/信号量/互斥量/条件变量](sync/readme.md)
 * [lock-free/wait-free](sync/readme.md)
