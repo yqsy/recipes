@@ -1,12 +1,13 @@
 <!-- TOC -->
 
-- [说明](#说明)
+- [1. 说明](#1-说明)
+- [2. 错误的提示](#2-错误的提示)
 
 <!-- /TOC -->
 
 
-<a id="markdown-说明" name="说明"></a>
-# 说明
+<a id="markdown-1-说明" name="1-说明"></a>
+# 1. 说明
 
 最大连接数在应用层的考虑点有两个
 * 作为客户端,connect  最大连接数多少?无法分配新的fd会怎么样?
@@ -52,3 +53,11 @@ cat /proc/sys/net/ipv4/tcp_rmem
 
 ```
 
+<a id="markdown-2-错误的提示" name="2-错误的提示"></a>
+# 2. 错误的提示
+
+文件描述符软限制不足够accept了:  
+too many open files
+
+端口数量不足够生成新的套接字去connect了:  
+dial tcp 127.0.0.1:5001: connect: cannot assign requested address

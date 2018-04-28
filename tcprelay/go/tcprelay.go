@@ -285,7 +285,7 @@ func ReadConfig(config *Config) bool {
 	if *readLocalLimitStr != "" {
 		config.readLocalLimit, err = bytefmt.ToBytes(*readLocalLimitStr)
 		if err != nil {
-			fmt.Printf("err: %v", err)
+			fmt.Printf("err: %v\n", err)
 			flag.Usage()
 			return false
 		}
@@ -294,7 +294,7 @@ func ReadConfig(config *Config) bool {
 	if *readRemoteLimitStr != "" {
 		config.readRemoteLimit, err = bytefmt.ToBytes(*readRemoteLimitStr)
 		if err != nil {
-			fmt.Printf("err: %v", err)
+			fmt.Printf("err: %v\n", err)
 			flag.Usage()
 			return false
 		}

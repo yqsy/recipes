@@ -24,8 +24,12 @@ type Context struct {
 }
 
 type Global struct {
+	// 已连接的数量
 	connectedNum int64
+
+	// 总连接数量
 	sessionNum   int
+
 	allCtx       []*Context
 
 	// protect slice
