@@ -234,14 +234,14 @@ type Context struct {
 }
 
 func NewContext(cmd int, channelConn net.Conn) *Context {
-	context := &Context{}
-	context.ChannelConn = channelConn
-	context.SendQueue = blockqueue.NewBlockQueue()
-	context.ConnectSessionDict = NewSessionDict()
-	context.Cmd = cmd
-	context.IdGen.InitWithMaxId(MaxId)
-	context.CloseCond = make(chan struct{}, 2)
-	return context
+	ctx := &Context{}
+	ctx.ChannelConn = channelConn
+	ctx.SendQueue = blockqueue.NewBlockQueue()
+	ctx.ConnectSessionDict = NewSessionDict()
+	ctx.Cmd = cmd
+	ctx.IdGen.InitWithMaxId(MaxId)
+	ctx.CloseCond = make(chan struct{}, 2)
+	return ctx
 }
 
 type ChannelPack struct {
@@ -521,7 +521,7 @@ func NewFinPack(id uint32) *ChannelPack {
 }
 
 // -> session
-func SessionSendEventLoop(context *Context, session *Session) {
+func SessionSendEventLoop(ctx *Context, session *Session) {
 	for {
 		recvPack := session.SendQueue.Take().(*ChannelPack)
 
@@ -533,7 +533,7 @@ func SessionSendEventLoop(context *Context, session *Session) {
 		session.RecvWaterMask += uint32(len(recvPack.Body))
 		if session.RecvWaterMask > ResumeWaterMask {
 			ackPack := NewAckPack(session.Id, session.RecvWaterMask)
-			context.SendQueue.Put(ackPack)
+			ctx.SendQueue.Put(ackPack)
 			session.RecvWaterMask = 0
 		}
 	}
@@ -544,7 +544,7 @@ func SessionSendEventLoop(context *Context, session *Session) {
 	log.Printf("[%v]session <- channel done", session.Id)
 }
 
-func SessionAckEventLoop(context *Context, session *Session) {
+func SessionAckEventLoop(ctx *Context, session *Session) {
 	for {
 		val := session.AckQueue.Take()
 
@@ -565,7 +565,7 @@ func SessionAckEventLoop(context *Context, session *Session) {
 }
 
 // <- session
-func SessionReadEventLoop(context *Context, session *Session) {
+func SessionReadEventLoop(ctx *Context, session *Session) {
 	for {
 		session.SendWaterMask.WaitUntilCanBeWrite()
 
@@ -581,13 +581,13 @@ func SessionReadEventLoop(context *Context, session *Session) {
 		}
 
 		payloadPack := NewPayloadPack(session.Id, buf[:rn])
-		context.SendQueue.Put(payloadPack)
+		ctx.SendQueue.Put(payloadPack)
 		session.SendWaterMask.RiseMask(uint32(rn))
 	}
 
 	// half close
 	finPack := NewFinPack(session.Id)
-	context.SendQueue.Put(finPack)
+	ctx.SendQueue.Put(finPack)
 	session.CloseCond <- struct{}{}
 	log.Printf("[%v]session -> channel done", session.Id)
 
@@ -596,28 +596,28 @@ func SessionReadEventLoop(context *Context, session *Session) {
 }
 
 // -> channel
-func ChannelSendEventLoop(context *Context) {
+func ChannelSendEventLoop(ctx *Context) {
 	for {
 
-		val := context.SendQueue.Take()
+		val := ctx.SendQueue.Take()
 		// 退出的接口
 		if val == nil {
 			break
 		}
 		sendPack := val.(*ChannelPack)
 		sendBytes := sendPack.Serialize()
-		wn, err := context.ChannelConn.Write(sendBytes)
+		wn, err := ctx.ChannelConn.Write(sendBytes)
 
 		if err != nil || wn != len(sendBytes) {
 			break
 		}
 	}
 
-	context.CloseCond <- struct{}{}
+	ctx.CloseCond <- struct{}{}
 }
 
-func DispatchToSession(context *Context, channelPack *ChannelPack) {
-	session := context.ConnectSessionDict.Find(channelPack.Head.Id)
+func DispatchToSession(ctx *Context, channelPack *ChannelPack) {
+	session := ctx.ConnectSessionDict.Find(channelPack.Head.Id)
 	if session == nil {
 		var cmd string
 		if len(channelPack.Body) < 20 {
@@ -635,26 +635,26 @@ func DispatchToSession(context *Context, channelPack *ChannelPack) {
 }
 
 // local accept
-func ServeSessionActive(context *Context, session *Session) {
+func ServeSessionActive(ctx *Context, session *Session) {
 	defer session.Conn.Close()
 
 	var err error
-	session.Id, err = context.IdGen.GetFreeId()
+	session.Id, err = ctx.IdGen.GetFreeId()
 	if err != nil {
 		log.Printf("session id not enough")
 		return
 	}
 	defer func() {
-		context.IdGen.ReleaseId(session.Id)
+		ctx.IdGen.ReleaseId(session.Id)
 		log.Printf("release id: %v", session.Id)
 	}()
 
-	context.ConnectSessionDict.Append(session)
-	defer context.ConnectSessionDict.Del(session.Id)
+	ctx.ConnectSessionDict.Append(session)
+	defer ctx.ConnectSessionDict.Del(session.Id)
 
 	// SYN
 	synPack := NewSynPack(session.Id)
-	context.SendQueue.Put(synPack)
+	ctx.SendQueue.Put(synPack)
 	recvPack := session.SendQueue.Take().(*ChannelPack)
 
 	if !recvPack.Head.IsCmd() || !recvPack.Body.IsSynOK() {
@@ -665,13 +665,13 @@ func ServeSessionActive(context *Context, session *Session) {
 	log.Printf("[%v]session <-> channel relay", session.Id)
 
 	// session <-block queue channel ack处理
-	go SessionAckEventLoop(context, session)
+	go SessionAckEventLoop(ctx, session)
 
 	// session <-block queue channel
-	go SessionSendEventLoop(context, session)
+	go SessionSendEventLoop(ctx, session)
 
 	// session (阻塞read)-> channel
-	SessionReadEventLoop(context, session)
+	SessionReadEventLoop(ctx, session)
 
 	// 两边都半关闭完,释放连接
 	for i := 0; i < 2; i++ {
@@ -682,21 +682,21 @@ func ServeSessionActive(context *Context, session *Session) {
 }
 
 // local connect
-func ServeSessionPassive(context *Context, session *Session) {
+func ServeSessionPassive(ctx *Context, session *Session) {
 	defer session.Conn.Close()
 
-	defer context.ConnectSessionDict.Del(session.Id)
+	defer ctx.ConnectSessionDict.Del(session.Id)
 
 	log.Printf("[%v]session <-> channel relay", session.Id)
 
 	// session <-block queue channel ack处理
-	go SessionAckEventLoop(context, session)
+	go SessionAckEventLoop(ctx, session)
 
 	// session <-block queue channel
-	go SessionSendEventLoop(context, session)
+	go SessionSendEventLoop(ctx, session)
 
 	// session (阻塞read)-> channel
-	SessionReadEventLoop(context, session)
+	SessionReadEventLoop(ctx, session)
 
 	// 两边都半关闭完,释放连接
 	for i := 0; i < 2; i++ {
@@ -707,40 +707,40 @@ func ServeSessionPassive(context *Context, session *Session) {
 }
 
 // 主动SYN方
-func ServerChannelActive(context *Context) {
-	defer context.ChannelConn.Close()
+func ServerChannelActive(ctx *Context) {
+	defer ctx.ChannelConn.Close()
 
 	// send channel (block queue , event loop)
-	go ChannelSendEventLoop(context)
+	go ChannelSendEventLoop(ctx)
 
 	// channel -> session
 	for {
-		channelPack, err := ReadChannelPack(context.ChannelConn)
+		channelPack, err := ReadChannelPack(ctx.ChannelConn)
 
 		if err != nil {
 			break
 		}
 
-		DispatchToSession(context, channelPack)
+		DispatchToSession(ctx, channelPack)
 	}
 
-	context.SendQueue.Put(nil)
-	context.ConnectSessionDict.FinAll()
-	context.CloseCond <- struct{}{}
+	ctx.SendQueue.Put(nil)
+	ctx.ConnectSessionDict.FinAll()
+	ctx.CloseCond <- struct{}{}
 
 	for i := 0; i < 2; i++ {
-		<-context.CloseCond
+		<-ctx.CloseCond
 	}
 }
 
 // 被动接收SYN,在本地去connect
-func ServerChannelPassive(context *Context, connectAddr string) {
+func ServerChannelPassive(ctx *Context, connectAddr string) {
 	// send channel (block queue , event loop)
-	go ChannelSendEventLoop(context)
+	go ChannelSendEventLoop(ctx)
 
 	// channel -> session
 	for {
-		channelPack, err := ReadChannelPack(context.ChannelConn)
+		channelPack, err := ReadChannelPack(ctx.ChannelConn)
 
 		if err != nil {
 			break
@@ -751,26 +751,26 @@ func ServerChannelPassive(context *Context, connectAddr string) {
 			if err != nil {
 				log.Printf("dial error %v", err)
 				synAckPack := NewSynAckPack(channelPack.Head.Id, false).Serialize()
-				context.ChannelConn.Write(synAckPack)
+				ctx.ChannelConn.Write(synAckPack)
 			} else {
 				synAckPack := NewSynAckPack(channelPack.Head.Id, true).Serialize()
-				context.ChannelConn.Write(synAckPack)
+				ctx.ChannelConn.Write(synAckPack)
 
 				session := NewSession(conn)
 				session.Id = channelPack.Head.Id
-				context.ConnectSessionDict.Append(session)
-				go ServeSessionPassive(context, session)
+				ctx.ConnectSessionDict.Append(session)
+				go ServeSessionPassive(ctx, session)
 			}
 		} else {
-			DispatchToSession(context, channelPack)
+			DispatchToSession(ctx, channelPack)
 		}
 	}
 
-	context.SendQueue.Put(nil)
-	context.ConnectSessionDict.FinAll()
-	context.CloseCond <- struct{}{}
+	ctx.SendQueue.Put(nil)
+	ctx.ConnectSessionDict.FinAll()
+	ctx.CloseCond <- struct{}{}
 
 	for i := 0; i < 2; i++ {
-		<-context.CloseCond
+		<-ctx.CloseCond
 	}
 }

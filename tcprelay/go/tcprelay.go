@@ -114,14 +114,14 @@ type Context struct {
 }
 
 func NewContext() *Context {
-	context := &Context{}
-	context.readLocalWaterMask = NewWaterMask()
-	context.stopReadLocalCount = make(chan struct{}, 1)
-	context.readRemoteWaterMask = NewWaterMask()
-	context.stopReadRemoteCount = make(chan struct{}, 1)
-	context.closeDone = make(chan struct{}, 2)
-	context.rand = rand.New(rand.NewSource(time.Now().UnixNano()))
-	return context
+	ctx := &Context{}
+	ctx.readLocalWaterMask = NewWaterMask()
+	ctx.stopReadLocalCount = make(chan struct{}, 1)
+	ctx.readRemoteWaterMask = NewWaterMask()
+	ctx.stopReadRemoteCount = make(chan struct{}, 1)
+	ctx.closeDone = make(chan struct{}, 2)
+	ctx.rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+	return ctx
 }
 
 func AddMaskPerSecond(waterMask *WaterMask, limitPerSecond uint64, stopCount chan struct{}) {
@@ -160,111 +160,111 @@ func Reserve1Bit(n byte, pos uint32) byte {
 	}
 }
 
-func Relay(config *Config, context *Context) {
-	defer context.localConn.Close()
+func Relay(config *Config, ctx *Context) {
+	defer ctx.localConn.Close()
 
 	var err error
-	context.remoteConn, err = net.Dial("tcp", *config.remoteAddr)
+	ctx.remoteConn, err = net.Dial("tcp", *config.remoteAddr)
 	if err != nil {
-		log.Printf("connect err: %v -> %v\n", context.localConn.RemoteAddr(), *config.remoteAddr)
+		log.Printf("connect err: %v -> %v\n", ctx.localConn.RemoteAddr(), *config.remoteAddr)
 		return
 	}
 
-	defer context.remoteConn.Close()
+	defer ctx.remoteConn.Close()
 
-	log.Printf("relay: %v <-> %v\n", context.localConn.RemoteAddr(), *config.remoteAddr)
+	log.Printf("relay: %v <-> %v\n", ctx.localConn.RemoteAddr(), *config.remoteAddr)
 
 	if config.IsLocalReadlLimit() {
-		go AddMaskPerSecond(context.readLocalWaterMask, config.readLocalLimit, context.stopReadLocalCount)
+		go AddMaskPerSecond(ctx.readLocalWaterMask, config.readLocalLimit, ctx.stopReadLocalCount)
 	}
 
 	if config.IsRemoteReadlLimit() {
-		go AddMaskPerSecond(context.readLocalWaterMask, config.readRemoteLimit, context.stopReadRemoteCount)
+		go AddMaskPerSecond(ctx.readLocalWaterMask, config.readRemoteLimit, ctx.stopReadRemoteCount)
 	}
 
 	// localConn -> proxy -> remoteConn
-	go func(config *Config, context *Context) {
+	go func(config *Config, ctx *Context) {
 		fixedBuffer := make([]byte, MaxReadBuffer)
 
 		for {
 			var buf []byte
 
 			if config.IsLocalReadlLimit() {
-				canReadBytes := context.readLocalWaterMask.WaitCanReadBytes()
+				canReadBytes := ctx.readLocalWaterMask.WaitCanReadBytes()
 				buf = fixedBuffer[:canReadBytes]
 			} else {
 				buf = fixedBuffer
 			}
 
-			rn, err := context.localConn.Read(buf)
+			rn, err := ctx.localConn.Read(buf)
 
 			if err != nil {
 				break
 			}
 
 			if config.IsReverseLocal() {
-				bytePos := context.rand.Intn(rn)
-				buf[bytePos] = Reserve1Bit(buf[bytePos], uint32(context.rand.Intn(8)))
+				bytePos := ctx.rand.Intn(rn)
+				buf[bytePos] = Reserve1Bit(buf[bytePos], uint32(ctx.rand.Intn(8)))
 			}
 
-			wn, err := context.remoteConn.Write(buf[:rn])
+			wn, err := ctx.remoteConn.Write(buf[:rn])
 			_ = wn
 			if err != nil {
 				break
 			}
 		}
 		if config.IsLocalReadlLimit() {
-			context.stopReadLocalCount <- struct{}{}
+			ctx.stopReadLocalCount <- struct{}{}
 		}
-		context.closeDone <- struct{}{}
+		ctx.closeDone <- struct{}{}
 
-		log.Printf("done: %v -> %v\n", context.localConn.RemoteAddr(), *config.remoteAddr)
-	}(config, context)
+		log.Printf("done: %v -> %v\n", ctx.localConn.RemoteAddr(), *config.remoteAddr)
+	}(config, ctx)
 
 	// localConn <- proxy <- remoteConn
-	go func(config *Config, context *Context) {
+	go func(config *Config, ctx *Context) {
 		fixedBuffer := make([]byte, MaxReadBuffer)
 
 		for {
 			var buf []byte
 
 			if config.IsRemoteReadlLimit() {
-				canReadBytes := context.readRemoteWaterMask.WaitCanReadBytes()
+				canReadBytes := ctx.readRemoteWaterMask.WaitCanReadBytes()
 				buf = fixedBuffer[:canReadBytes]
 			} else {
 				buf = fixedBuffer
 			}
 
-			rn, err := context.remoteConn.Read(buf)
+			rn, err := ctx.remoteConn.Read(buf)
 
 			if err != nil {
 				break
 			}
 
 			if config.IsReverseRemote() {
-				bytePos := context.rand.Intn(rn)
-				buf[bytePos] = Reserve1Bit(buf[bytePos], uint32(context.rand.Intn(8)))
+				bytePos := ctx.rand.Intn(rn)
+				buf[bytePos] = Reserve1Bit(buf[bytePos], uint32(ctx.rand.Intn(8)))
 			}
 
-			wn, err := context.localConn.Write(buf[:rn])
+			wn, err := ctx.localConn.Write(buf[:rn])
 			_ = wn
 			if err != nil {
 				break
 			}
 		}
 		if config.IsRemoteReadlLimit() {
-			context.stopReadRemoteCount <- struct{}{}
+			ctx.stopReadRemoteCount <- struct{}{}
 		}
-		context.closeDone <- struct{}{}
+		ctx.closeDone <- struct{}{}
 
-		log.Printf("done: %v <- %v\n", context.localConn.RemoteAddr(), *config.remoteAddr)
-	}(config, context)
+		log.Printf("done: %v <- %v\n", ctx.localConn.RemoteAddr(), *config.remoteAddr)
+	}(config, ctx)
 
 	for i := 0; i < 2; i++ {
-		<-context.closeDone
+		<-ctx.closeDone
 	}
 
-	log.Printf("done: %v <-> %v\n", context.localConn.RemoteAddr(), *config.remoteAddr)
+	log.Printf("done: %v <-> %v\n", ctx.localConn.RemoteAddr(), *config.remoteAddr)
 }
 
 func ReadConfig(config *Config) bool {
@@ -318,14 +318,14 @@ func main() {
 	defer listener.Close()
 
 	for {
-		context := NewContext()
+		ctx := NewContext()
 
 		var err error
-		context.localConn, err = listener.Accept()
+		ctx.localConn, err = listener.Accept()
 		if err != nil {
 			continue
 		}
 
-		go Relay(config, context)
+		go Relay(config, ctx)
 	}
 }

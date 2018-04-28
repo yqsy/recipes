@@ -17,19 +17,19 @@ var usage = `Usage:
 -L: local listen and connect to remote in channel
 -R: remote listen and connect to local in channel`
 
-func serverChannelConnect(context *common.Context) {
-	common.ServerChannelActive(context)
+func serverChannelConnect(ctx *common.Context) {
+	common.ServerChannelActive(ctx)
 	log.Printf("read EOF from channel , reconnect channel")
 }
 
-func serverChannelBind(context *common.Context) {
-	common.ServerChannelPassive(context, context.MultiplexerConnectAddr)
+func serverChannelBind(ctx *common.Context) {
+	common.ServerChannelPassive(ctx, ctx.MultiplexerConnectAddr)
 	log.Printf("read EOF from channel , reconnect channel")
 }
 
-func serveLocalListener(context *common.Context) {
+func serveLocalListener(ctx *common.Context) {
 	for {
-		conn, err := context.MultiplexerLocalListener.Accept()
+		conn, err := ctx.MultiplexerLocalListener.Accept()
 
 		// TODO: 因为channel的关闭会导致listener的关闭,所以我暂时没做描述符满的操作(怎么区别两种关闭?)
 		if err != nil {
@@ -37,7 +37,7 @@ func serveLocalListener(context *common.Context) {
 		}
 
 		session := common.NewSession(conn)
-		go common.ServeSessionActive(context, session)
+		go common.ServeSessionActive(ctx, session)
 	}
 
 	log.Printf("listener close")
@@ -73,18 +73,18 @@ func doConnectWay(arg []string) {
 
 		log.Printf("CONNECT ok %v", dmuxAddr)
 
-		context := common.NewContext(common.Connect, channelConn)
-		context.MultiplexerLocalListener, err = net.Listen("tcp", localListenAddr)
+		ctx := common.NewContext(common.Connect, channelConn)
+		ctx.MultiplexerLocalListener, err = net.Listen("tcp", localListenAddr)
 		if err != nil {
 			panic(err)
 		}
 
-		go serveLocalListener(context)
+		go serveLocalListener(ctx)
 
-		serverChannelConnect(context)
+		serverChannelConnect(ctx)
 
 		// 在这里关闭,保证重启channel时能listen成功
-		context.MultiplexerLocalListener.Close()
+		ctx.MultiplexerLocalListener.Close()
 	}
 }
 
@@ -118,10 +118,10 @@ func doBindWay(arg []string) {
 
 		log.Printf("BIND ok %v", dmuxAddr)
 
-		context := common.NewContext(common.Bind, channelConn)
-		context.MultiplexerConnectAddr = localConnectAddr
+		ctx := common.NewContext(common.Bind, channelConn)
+		ctx.MultiplexerConnectAddr = localConnectAddr
 
-		serverChannelBind(context)
+		serverChannelBind(ctx)
 	}
 }
 

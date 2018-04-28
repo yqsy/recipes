@@ -67,7 +67,7 @@
 * [file-transfer(文件传输)]()
 * [connection-pool(连接池)]()
 * [identity-verification(通道身份验证)]()
-* [maxconnection(最大连接数)]()
+* [maxconnection(最大连接数)](maxconnection/readme.md)
 * [heart-beat(心跳包)]()
 * [idleconnection(空闲连接时间轮/堆/升序链表/多线程做法)](idleconnection/readme.md)
 * [roundtrip(测时间差)](roundtrip)

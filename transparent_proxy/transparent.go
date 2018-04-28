@@ -138,12 +138,12 @@ func main() {
 	defer listener.Close()
 
 	for {
-		context := &Context{socksAddr: arg[2], closeDone: make(chan struct{}, 2)}
+		ctx := &Context{socksAddr: arg[2], closeDone: make(chan struct{}, 2)}
 		var err error
-		context.localConn, err = listener.Accept()
+		ctx.localConn, err = listener.Accept()
 		if err != nil {
 			panic(err)
 		}
-		go serve(context)
+		go serve(ctx)
 	}
 }
