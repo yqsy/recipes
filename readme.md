@@ -49,7 +49,7 @@
 
 * [pingpong](pingpong/readme.md)
 * [http vs nginx](http_bench/readme.md)
-* [固长 vs zeromq](zeromq)
+* [zeromq延迟吞吐测试](zeromq/readme.md)
 
 
 <a id="markdown-31-chat类型" name="31-chat类型"></a>
