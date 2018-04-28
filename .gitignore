@@ -295,3 +295,6 @@ pingpong/go/bin/client
 pingpong/go/bin/server
 pingpong/asio/bench.sh
 pingpong/go/bin/bench.sh
+pingpong/libevent/client
+pingpong/libevent/server
+pingpong/libevent/bench.sh

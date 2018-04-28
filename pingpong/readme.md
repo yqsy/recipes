@@ -5,6 +5,7 @@
     - [2.1. 说明](#21-说明)
     - [2.2. asio](#22-asio)
     - [2.3. go](#23-go)
+- [3. libevent](#3-libevent)
 
 <!-- /TOC -->
 
@@ -16,6 +17,7 @@
 * http://think-async.com/Asio/LinuxPerformanceImprovements
 * https://sourceforge.net/projects/asio/ (asio单独库的下载)
 
+![](pingpong.png)
 
 安装asio的库
 ```bash
@@ -34,7 +36,7 @@ sudo make install
 
 * 缓冲区固定为16k(不需要太大)
 * 时间90s
-* asio服务端,客户端线程时都为4个,均匀分配8核心的资源
+* 单线程
 * 连接数量从1 10 100 1000 10000 不等
 
 <a id="markdown-22-asio" name="22-asio"></a>
@@ -49,17 +51,15 @@ cat > ./bench.sh << EOF
 
 killall server
 timeout=90
-for bufsize in 16384
-do
-  for nothreads in 4 
-  do
-    for nosessions in 1 10 100 1000 10000
-    do
+for bufsize in 16384; do
+  for nothreads in 1; do
+    for nosessions in 1 10 100 1000 10000; do
       echo "Bufsize: \$bufsize Threads: \$nothreads Sessions: \$nosessions"
-      ./server 0.0.0.0 55555 \$nothreads \$bufsize & srvpid=\$!
-      ./client localhost 55555 \$nothreads \$bufsize \$nosessions \$timeout 
+      taskset -c 1 ./server 0.0.0.0 55555 \$nothreads \$bufsize & srvpid=\$!
+      sleep 3
+      taskset -c 2 ./client localhost 55555 \$nothreads \$bufsize \$nosessions \$timeout 
       kill -9 \$srvpid
-      sleep 1
+      sleep 5
     done
   done
 done
@@ -91,18 +91,45 @@ cat > ./bench.sh << EOF
 #!/bin/bash
 killall server
 timeout=90
-for bufsize in 16384
-do
-  for nosessions in 1 10 100 1000 10000
-  do
+for bufsize in 16384; do
+  for nosessions in 1 10 100 1000 10000; do
     echo "Bufsize: \$bufsize Sessions: \$nosessions"
-    ./server 0.0.0.0:55555 \$bufsize & srvpid=\$!
-    ./client localhost:55555 \$bufsize \$nosessions \$timeout 
+    taskset -c 1 ./server 0.0.0.0:55555 \$bufsize & srvpid=\$!
+    sleep 3
+    taskset -c 2 ./client localhost:55555 \$bufsize \$nosessions \$timeout 
     kill -9 \$srvpid
-    sleep 1
+    sleep 5
   done
 done
 EOF
 chmod +x bench.sh
 
 ```
+<a id="markdown-3-libevent" name="3-libevent"></a>
+# 3. libevent
+
+```bash
+cmake -DCMAKE_BUILD_TYPE=RELEASE
+make
+
+cat > ./bench.sh << EOF
+#!/bin/bash
+
+killall server
+timeout=90
+bufsize=16384
+nothreads=1
+
+for nosessions in 1 10 100 1000 10000; do
+  echo "Bufsize: \$bufsize Threads: \$nothreads Sessions: \$nosessions"
+  taskset -c 1 ./server 2> /dev/null & srvpid=\$!
+  sleep 3
+  taskset -c 2 ./client 9876 \$bufsize \$nosessions \$timeout
+  kill -9 \$srvpid
+  sleep 5
+done
+EOF
+
+chmod +x bench.sh
+```
+
