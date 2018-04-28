@@ -33,7 +33,7 @@ sudo make install
 由于底层并发模型的区别,测试asio时部分参数采用我本机`Intel(R) Xeon(R) CPU E3-1231 v3 @ 3.40GHz`最大性能配比
 
 * 缓冲区固定为16k(不需要太大)
-* 时间30s
+* 时间90s
 * asio服务端,客户端线程时都为4个,均匀分配8核心的资源
 * 连接数量从1 10 100 1000 10000 不等
 
@@ -48,7 +48,7 @@ cat > ./bench.sh << EOF
 #!/bin/bash
 
 killall server
-timeout=30
+timeout=90
 for bufsize in 16384
 do
   for nothreads in 4 
@@ -59,6 +59,7 @@ do
       ./server 0.0.0.0 55555 \$nothreads \$bufsize & srvpid=\$!
       ./client localhost 55555 \$nothreads \$bufsize \$nosessions \$timeout 
       kill -9 \$srvpid
+      sleep 1
     done
   done
 done
@@ -79,7 +80,7 @@ cd client
 go build client.go
 mv client ../bin
 
-cd server
+cd ../server
 go build server.go
 mv server ../bin
 
@@ -89,7 +90,7 @@ cd ../bin
 cat > ./bench.sh << EOF
 #!/bin/bash
 killall server
-timeout=30
+timeout=90
 for bufsize in 16384
 do
   for nosessions in 1 10 100 1000 10000
@@ -98,6 +99,7 @@ do
     ./server 0.0.0.0:55555 \$bufsize & srvpid=\$!
     ./client localhost:55555 \$bufsize \$nosessions \$timeout 
     kill -9 \$srvpid
+    sleep 1
   done
 done
 EOF
