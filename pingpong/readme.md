@@ -5,7 +5,7 @@
     - [2.1. 说明](#21-说明)
     - [2.2. asio](#22-asio)
     - [2.3. go](#23-go)
-- [3. libevent](#3-libevent)
+    - [2.4. libevent](#24-libevent)
 
 <!-- /TOC -->
 
@@ -105,8 +105,8 @@ EOF
 chmod +x bench.sh
 
 ```
-<a id="markdown-3-libevent" name="3-libevent"></a>
-# 3. libevent
+<a id="markdown-24-libevent" name="24-libevent"></a>
+## 2.4. libevent
 
 ```bash
 cmake -DCMAKE_BUILD_TYPE=RELEASE

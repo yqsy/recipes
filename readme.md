@@ -48,9 +48,8 @@
 # 3. 测吞吐
 
 * [pingpong](pingpong/readme.md)
-* [pass_flower(击鼓传花)](pass_flower)
-* [nginx](nginx)
-* [zeromq](zeromq)
+* [http vs nginx](nginx)
+* [固长 vs zeromq](zeromq)
 
 
 <a id="markdown-31-chat类型" name="31-chat类型"></a>
