@@ -8,7 +8,8 @@ import (
 )
 
 var usage = `Usage:
-%v listenAddr bufSize`
+%v listenAddr bufSize
+`
 
 type Context struct {
 	bufSize int

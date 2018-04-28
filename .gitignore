@@ -290,3 +290,8 @@ pingpong/go/client/client
 pingpong/go/server/server
 pingpong/asio/server
 pingpong/asio/client
+pingpong/go/bin/client
+pingpong/go/bin/client
+pingpong/go/bin/server
+pingpong/asio/bench.sh
+pingpong/go/bin/bench.sh

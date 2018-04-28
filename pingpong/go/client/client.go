@@ -11,7 +11,8 @@ import (
 )
 
 var usage = `Usage:
-%v connectAddr bufSize sessionNum timeout`
+%v connectAddr bufSize sessionNum timeout
+`
 
 type Context struct {
 	bufSize   int
