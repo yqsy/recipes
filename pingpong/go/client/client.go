@@ -4,10 +4,10 @@ import (
 	"net"
 	"time"
 	"sync/atomic"
-	"os"
 	"fmt"
-	"strconv"
 	"sync"
+	"strconv"
+	"os"
 )
 
 var usage = `Usage:
