@@ -298,3 +298,4 @@ pingpong/go/bin/bench.sh
 pingpong/libevent/client
 pingpong/libevent/server
 pingpong/libevent/bench.sh
+http_bench/go/server

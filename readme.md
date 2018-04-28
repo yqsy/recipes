@@ -48,7 +48,7 @@
 # 3. 测吞吐
 
 * [pingpong](pingpong/readme.md)
-* [http vs nginx](nginx)
+* [http vs nginx](http_bench/readme.md)
 * [固长 vs zeromq](zeromq)
 
 
