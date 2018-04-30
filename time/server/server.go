@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"time"
+	"encoding/binary"
 )
 
 var usage = `Usage:
@@ -17,15 +18,13 @@ type Context struct {
 
 func serve(ctx *Context) {
 	defer ctx.conn.Close()
+	now := time.Now()
+	secs := now.Unix()
 
-	t := time.Now()
-
-	wn, err := ctx.conn.Write([]byte(t.String()))
+	err := binary.Write(ctx.conn, binary.BigEndian, secs)
 	if err != nil {
 		return
 	}
-
-	_ = wn
 
 	// safe close
 	ctx.conn.(*net.TCPConn).CloseWrite()

@@ -39,7 +39,7 @@
 * [echo](echo)
 * [discard](discard)
 * [chargen]()
-* [time]()
+* [time](time/readme.md)
 * [daytime](daytime)
 * [ttcp](ttcp/readme.md)
 * [simplehttp(s)](simplehttp)
