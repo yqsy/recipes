@@ -21,7 +21,7 @@ func panicOnError(err error) {
 
 func serve(conn net.Conn) {
 	defer conn.Close()
-	buf := make([]byte, 32*16384)
+	buf := make([]byte, 32*1024)
 	for {
 		rn, err := conn.Read(buf)
 		if err != nil {

@@ -14,19 +14,30 @@ func handleConn(conn net.Conn) {
 
 	bufReader := bufio.NewReader(conn)
 
+	line, err := bufReader.ReadString('\n')
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	log.Print(line)
+
+	wn, err := conn.Write([]byte("world\n"))
+	_ = wn
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	// safe close
+	conn.(*tls.Conn).CloseWrite()
+
+	buf := make([]byte, 1024)
 	for {
-		line, err := bufReader.ReadString('\n')
-		if err != nil {
-			log.Println(err)
-			break
-		}
+		rn, err := conn.Read(buf)
+		_ = rn
 
-		log.Print(line)
-
-		wn, err := conn.Write([]byte("world\n"))
-		_ = wn
 		if err != nil {
-			log.Println(err)
 			break
 		}
 	}

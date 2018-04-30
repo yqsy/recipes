@@ -37,10 +37,10 @@
 ## 2.2. echo
 
 * [echo](echo)
+* [discard](discard)
 * [chargen]()
 * [time]()
-* [daytime]()
-* [discard](discard)
+* [daytime](daytime)
 * [ttcp](ttcp/readme.md)
 * [simplehttp(s)](simplehttp)
 
