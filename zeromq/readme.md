@@ -7,12 +7,17 @@
 
 <a id="markdown-1-说明" name="1-说明"></a>
 # 1. 说明
+
+
 参考
 * http://zeromq.org/distro:debian (install)
 * http://zeromq.org/area:results (benchmark)
 * http://zeromq.org/results:perf-howto
 * http://zguide.zeromq.org/ (document)
 * http://zeromq.org/intro:get-the-software (从源码安装)
+
+
+![](latency.png)
 
 库安装的方法
 ```bash
@@ -43,7 +48,39 @@ make check && sudo make install && sudo ldconfig
 # 2. Latency benchmark
 
 zeromq
-```
+```bash
 cd /media/yq/ST1000DM003/linux/reference/refer/libzmq/perf
+
+for msgSize in 1 2 4 8 16 32 64 128 512 1024 2048 4096 8192 16384; do
+  taskset -c 1 ./local_lat tcp://0.0.0.0:5555 $msgSize 100000 & srvpid=$!
+  sleep 3
+  taskset -c 2 ./remote_lat tcp://127.0.0.1:5555 $msgSize 100000
+  kill -9 $srvpid
+  sleep 5
+done
+```
+
+
+go
+```bash
+cd /home/yq/go/src/github.com/yqsy/recipes/zeromq/go
+mkdir bin
+cd local_lat
+go build local_lat.go 
+mv local_lat ../bin
+
+cd ../remote_lat
+go build remote_lat.go 
+mv remote_lat ../bin
+
+cd ../bin
+
+for msgSize in 1 2 4 8 16 32 64 128 512 1024 2048 4096 8192 16384; do
+  taskset -c 1 ./local_lat 0.0.0.0:5555 $msgSize 100000 & srvpid=$!
+  sleep 3
+  taskset -c 2 ./remote_lat localhost:5555 $msgSize 100000
+  kill -9 $srvpid
+  sleep 5
+done
 
 ```
