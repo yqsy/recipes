@@ -14,12 +14,12 @@ var usage = `Usage:
 
 func serverChannelConnect(ctx *common.Context) {
 	common.ServerChannelPassive(ctx, ctx.DmuxConnectAddr)
-	log.Printf("read EOF from channel , reaccept channel")
+	log.Printf("read EOF from channel , reaccept channel\n")
 }
 
 func serverChannelBind(ctx *common.Context) {
 	common.ServerChannelActive(ctx)
-	log.Printf("read EOF from channel , reaccept channel")
+	log.Printf("read EOF from channel , reaccept channel\n")
 }
 
 func serverLocalListener(ctx *common.Context) {
@@ -35,7 +35,7 @@ func serverLocalListener(ctx *common.Context) {
 		go common.ServeSessionActive(ctx, session)
 	}
 
-	log.Printf("listener close")
+	log.Printf("listener close\n")
 }
 
 func doConnectWay(channelConn net.Conn, cmd common.ChannelBody) {
@@ -43,13 +43,13 @@ func doConnectWay(channelConn net.Conn, cmd common.ChannelBody) {
 	var err error
 	ctx.DmuxConnectAddr, err = cmd.GetConnectAddr()
 	if err != nil {
-		log.Printf("CONNECT addr error: %v", err)
+		log.Printf("CONNECT addr error: %v\n", err)
 		connectAckPack := common.NewConnectAckPack(false).Serialize()
 		channelConn.Write(connectAckPack)
 	} else {
 		connectAckPack := common.NewConnectAckPack(true).Serialize()
 		channelConn.Write(connectAckPack)
-		log.Printf("CONNECT ok %v", channelConn.RemoteAddr())
+		log.Printf("CONNECT ok %v\n", channelConn.RemoteAddr())
 		serverChannelConnect(ctx)
 	}
 }
@@ -61,13 +61,13 @@ func doBindWay(channelConn net.Conn, cmd common.ChannelBody) {
 
 	ctx.DmuxLolcalListener, err = net.Listen("tcp", bindAddr)
 	if err != nil {
-		log.Printf("BIND addr error: %v", err)
+		log.Printf("BIND addr error: %v\n", err)
 		bindAckPack := common.NewBindAckPack(false).Serialize()
 		channelConn.Write(bindAckPack)
 	} else {
 		bindAckPack := common.NewBindAckPack(true).Serialize()
 		channelConn.Write(bindAckPack)
-		log.Printf("BIND ok %v", channelConn.RemoteAddr())
+		log.Printf("BIND ok %v\n", channelConn.RemoteAddr())
 
 		go serverLocalListener(ctx)
 
@@ -96,7 +96,7 @@ func main() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Printf("accept error %v", err)
+			log.Printf("accept error %v\n", err)
 			time.Sleep(time.Second * 3)
 			continue
 		}
@@ -107,7 +107,7 @@ func main() {
 			cmd, err := common.ReadChannelCmd(channelConn)
 
 			if err != nil {
-				log.Printf("recv err cmd len: %v", len(cmd))
+				log.Printf("recv err cmd len: %v\n", len(cmd))
 				return
 			}
 
@@ -116,7 +116,7 @@ func main() {
 			} else if cmd.IsBind() {
 				doBindWay(channelConn, cmd)
 			} else {
-				log.Printf("un sopported cmd len: %v", len(cmd))
+				log.Printf("un sopported cmd len: %v\n", len(cmd))
 			}
 		}(conn)
 	}

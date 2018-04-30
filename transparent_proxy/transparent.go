@@ -32,12 +32,12 @@ func serve(ctx *Context) {
 	ctx.originPort = binary.BigEndian.Uint16([]byte{addr.Multiaddr[2], addr.Multiaddr[3]})
 	ctx.originAddr = fmt.Sprintf("%v:%v", ctx.GetIpv4Str(), ctx.originPort)
 
-	log.Printf("originAddr: %v", ctx.originAddr)
+	log.Printf("originAddr: %v\n", ctx.originAddr)
 
 	ctx.socks4Conn, err = net.Dial("tcp", ctx.socksAddr)
 
 	if err != nil {
-		log.Printf("socks4 server dial error: %v", err)
+		log.Printf("socks4 server dial error: %v\n", err)
 		return
 	}
 	defer ctx.socks4Conn.Close()
@@ -52,19 +52,19 @@ func serve(ctx *Context) {
 	binary.Write(&buf, binary.BigEndian, []byte{0x00})
 	wn, err := ctx.socks4Conn.Write(buf.Bytes())
 	if err != nil || wn != len(buf.Bytes()) {
-		log.Printf("socks4 server handshake error: %v", err)
+		log.Printf("socks4 server handshake error: %v\n", err)
 		return
 	}
 
 	var socks4Res socks4.Socks4Res
 	err = binary.Read(ctx.socks4Conn, binary.BigEndian, &socks4Res)
 	if err != nil {
-		log.Printf("socks4 server handshake error: %v", err)
+		log.Printf("socks4 server handshake error: %v\n", err)
 		return
 	}
 
 	if !socks4Res.IsSuccess() {
-		log.Printf("socks4 server handshake error")
+		log.Printf("socks4 server handshake error\n")
 		return
 	}
 

@@ -19,12 +19,12 @@ var usage = `Usage:
 
 func serverChannelConnect(ctx *common.Context) {
 	common.ServerChannelActive(ctx)
-	log.Printf("read EOF from channel , reconnect channel")
+	log.Printf("read EOF from channel , reconnect channel\n")
 }
 
 func serverChannelBind(ctx *common.Context) {
 	common.ServerChannelPassive(ctx, ctx.MultiplexerConnectAddr)
-	log.Printf("read EOF from channel , reconnect channel")
+	log.Printf("read EOF from channel , reconnect channel\n")
 }
 
 func serveLocalListener(ctx *common.Context) {
@@ -40,7 +40,7 @@ func serveLocalListener(ctx *common.Context) {
 		go common.ServeSessionActive(ctx, session)
 	}
 
-	log.Printf("listener close")
+	log.Printf("listener close\n")
 }
 
 func doConnectWay(arg []string) {
@@ -53,7 +53,7 @@ func doConnectWay(arg []string) {
 		channelConn, err := net.Dial("tcp", dmuxAddr)
 
 		if err != nil {
-			log.Printf("dial error %v", dmuxAddr)
+			log.Printf("dial error %v\n", dmuxAddr)
 			time.Sleep(time.Second * 3)
 			continue
 		}
@@ -61,17 +61,17 @@ func doConnectWay(arg []string) {
 		connectPack := common.NewConnectPack(remoteConnectAddr).Serialize()
 		wn, err := channelConn.Write(connectPack)
 		if err != nil || wn != len(connectPack) {
-			log.Printf("CONNECT error")
+			log.Printf("CONNECT error\n")
 			continue
 		}
 
 		cmd, err := common.ReadChannelCmd(channelConn)
 		if err != nil || !cmd.IsConnectOK() {
-			log.Printf("CONNECT error")
+			log.Printf("CONNECT error\n")
 			continue
 		}
 
-		log.Printf("CONNECT ok %v", dmuxAddr)
+		log.Printf("CONNECT ok %v\n", dmuxAddr)
 
 		ctx := common.NewContext(common.Connect, channelConn)
 		ctx.MultiplexerLocalListener, err = net.Listen("tcp", localListenAddr)
@@ -98,7 +98,7 @@ func doBindWay(arg []string) {
 		channelConn, err := net.Dial("tcp", dmuxAddr)
 
 		if err != nil {
-			log.Printf("dial error %v", dmuxAddr)
+			log.Printf("dial error %v\n", dmuxAddr)
 			time.Sleep(time.Second * 3)
 			continue
 		}
@@ -106,17 +106,17 @@ func doBindWay(arg []string) {
 		bindPack := common.NewBindPack(remoteListenAddr).Serialize()
 		wn, err := channelConn.Write(bindPack)
 		if err != nil || wn != len(bindPack) {
-			log.Printf("BIND error")
+			log.Printf("BIND error\n")
 			continue
 		}
 
 		cmd, err := common.ReadChannelCmd(channelConn)
 		if err != nil || !cmd.IsBindOK() {
-			log.Printf("BIND error")
+			log.Printf("BIND error\n")
 			continue
 		}
 
-		log.Printf("BIND ok %v", dmuxAddr)
+		log.Printf("BIND ok %v\n", dmuxAddr)
 
 		ctx := common.NewContext(common.Bind, channelConn)
 		ctx.MultiplexerConnectAddr = localConnectAddr

@@ -11,7 +11,7 @@ func main() {
 	arg := os.Args
 
 	if len(arg) != 3 {
-		fmt.Printf("usage: %v listenaddr file", arg[0])
+		fmt.Printf("usage: %v listenaddr file\n", arg[0])
 		return
 	}
 
