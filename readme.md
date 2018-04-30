@@ -38,7 +38,7 @@
 
 * [echo](echo)
 * [discard](discard)
-* [chargen]()
+* [chargen](chargen)
 * [time](time/readme.md)
 * [daytime](daytime)
 * [ttcp](ttcp/readme.md)
