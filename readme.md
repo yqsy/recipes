@@ -2,12 +2,12 @@
 
 - [1. 说明](#1-说明)
 - [2. 网络部分](#2-网络部分)
-    - [2.1. proxy类型](#21-proxy类型)
-    - [2.2. echo 类型](#22-echo-类型)
-- [3. 测吞吐](#3-测吞吐)
-    - [3.1. chat类型](#31-chat类型)
-    - [3.2. 其他](#32-其他)
-- [4. 底层部分](#4-底层部分)
+    - [2.1. proxy](#21-proxy)
+    - [2.2. echo](#22-echo)
+    - [2.3. benchmark](#23-benchmark)
+    - [2.4. chat](#24-chat)
+    - [2.5. 其他](#25-其他)
+- [3. 底层部分](#3-底层部分)
 
 <!-- /TOC -->
 
@@ -19,8 +19,8 @@
 <a id="markdown-2-网络部分" name="2-网络部分"></a>
 # 2. 网络部分
 
-<a id="markdown-21-proxy类型" name="21-proxy类型"></a>
-## 2.1. proxy类型
+<a id="markdown-21-proxy" name="21-proxy"></a>
+## 2.1. proxy
 
 * [socks(4|4a|5)proxy](socks/readme.md)
 * [http(s)proxy](httpproxy/readme.md)
@@ -33,8 +33,8 @@
 * [tls_tun/tls_netcat](tls_tun/readme.md)
 * [transparent_proxy(透明代理)](transparent_proxy/readme.md)
 
-<a id="markdown-22-echo-类型" name="22-echo-类型"></a>
-## 2.2. echo 类型
+<a id="markdown-22-echo" name="22-echo"></a>
+## 2.2. echo
 
 * [echo](echo)
 * [chargen]()
@@ -44,23 +44,22 @@
 * [ttcp](ttcp/readme.md)
 * [simplehttp(s)](simplehttp)
 
-<a id="markdown-3-测吞吐" name="3-测吞吐"></a>
-# 3. 测吞吐
+<a id="markdown-23-benchmark" name="23-benchmark"></a>
+## 2.3. benchmark
 
 * [pingpong](pingpong/readme.md)
-* [http vs nginx](http_bench/readme.md)
-* [zeromq延迟吞吐测试](zeromq/readme.md)
+* [httpbench](http_bench/readme.md)
+* [zeromq延迟](zeromq/readme.md)
 
-
-<a id="markdown-31-chat类型" name="31-chat类型"></a>
-## 3.1. chat类型
+<a id="markdown-24-chat" name="24-chat"></a>
+## 2.4. chat
 
 * [hub]()
 * [pub-sub]()
 
 
-<a id="markdown-32-其他" name="32-其他"></a>
-## 3.2. 其他
+<a id="markdown-25-其他" name="25-其他"></a>
+## 2.5. 其他
 
 * [incomplete_send(tcp发送数据不完整例子)](incomplete_send/readme.md)
 * [file-transfer(文件传输)]()
@@ -76,8 +75,8 @@
 * [N皇后]()
 * [多机求解中位数]()
 
-<a id="markdown-4-底层部分" name="4-底层部分"></a>
-# 4. 底层部分
+<a id="markdown-3-底层部分" name="3-底层部分"></a>
+# 3. 底层部分
 
 * [自旋锁/读写锁/信号量/互斥量/条件变量](sync/readme.md)
 * [lock-free/wait-free](sync/readme.md)
