@@ -59,7 +59,7 @@ func (subs *Subs) pubMsg(msg *common.Msg) {
 		if err != nil {
 			// 肯定已经关闭了
 			delete(subs.array, sub)
-			log.Printf("write error force unsub %v", sub.conn.RemoteAddr())
+			log.Printf("write error force unsub %v\n", sub.conn.RemoteAddr())
 		}
 	}
 }
@@ -124,10 +124,10 @@ func serve(ctx *Context, gb *Global) {
 		if msg.Cmd == "sub" {
 			gb.addSub(msg.Topic, ctx)
 			ctx.way = "sub"
-			log.Printf("sub %v %v", msg.Topic, ctx.conn.RemoteAddr())
+			log.Printf("sub %v %v\n", msg.Topic, ctx.conn.RemoteAddr())
 		} else if msg.Cmd == "unsub" {
 			gb.removeSub(msg.Topic, ctx)
-			log.Printf("unsub %v %v", msg.Topic, ctx.conn.RemoteAddr())
+			log.Printf("unsub %v %v\n", msg.Topic, ctx.conn.RemoteAddr())
 		} else if msg.Cmd == "pub" {
 			gb.pubMsg(msg)
 			ctx.way = "pub"
@@ -136,7 +136,7 @@ func serve(ctx *Context, gb *Global) {
 	}
 
 	if ctx.way == "pub" {
-		log.Printf("pub exit pubNum: %v %v", ctx.pubNum, ctx.conn.RemoteAddr())
+		log.Printf("pub exit pubNum: %v %v\n", ctx.pubNum, ctx.conn.RemoteAddr())
 	}
 }
 

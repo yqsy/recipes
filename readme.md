@@ -49,18 +49,18 @@
 
 * [pingpong](pingpong)
 * [httpbench](http_bench)
-* [zeromq延迟](zeromq)
+* [zeromq(延迟)](zeromq)
 
 <a id="markdown-24-chat" name="24-chat"></a>
 ## 2.4. chat
 
 * [hub-pub-sub](hub)
+* [chat(聊天室)](chat)
 
 <a id="markdown-25-其他" name="25-其他"></a>
 ## 2.5. 其他
 
 * [incomplete_send(tcp发送数据不完整例子)](incomplete_send)
-* [file-transfer(文件传输)]()
 * [connection-pool(连接池)]()
 * [identity-verification(通道身份验证)]()
 * [maxconnection(最大连接数)](maxconnection)
