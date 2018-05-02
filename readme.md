@@ -54,9 +54,7 @@
 <a id="markdown-24-chat" name="24-chat"></a>
 ## 2.4. chat
 
-* [hub]()
-* [pub-sub]()
-
+* [hub-pub-sub](hub)
 
 <a id="markdown-25-其他" name="25-其他"></a>
 ## 2.5. 其他
