@@ -54,20 +54,20 @@
 <a id="markdown-24-chat" name="24-chat"></a>
 ## 2.4. chat
 
-* [hub-pub-sub](hub)
+* [hub_pub_sub](hub)
 * [chat(聊天室)](chat)
 
 <a id="markdown-25-其他" name="25-其他"></a>
 ## 2.5. 其他
 
 * [incomplete_send(tcp发送数据不完整例子)](incomplete_send)
-* [connection-pool(连接池)]()
-* [identity-verification(通道身份验证)]()
+* [connection_pool(连接池)]()
+* [identity_verification(通道身份验证)](verification)
 * [maxconnection(最大连接数)](maxconnection)
-* [heart-beat(心跳包)]()
+* [heart_beat(心跳包)]()
 * [idleconnection(空闲连接时间轮/堆/升序链表/多线程做法)](idleconnection)
 * [roundtrip(测时间差)](roundtrip)
-* [simple-rpc]()
+* [simple_rpc]()
 * [sudoku(数独)]()
 * [procmon(简易监控)](procmon)
 * [N皇后]()
@@ -77,7 +77,7 @@
 # 3. 底层部分
 
 * [自旋锁/读写锁/信号量/互斥量/条件变量](sync)
-* [lock-free/wait-free](sync)
+* [lock_free/wait_free](sync)
 * [blockqueue](blockqueue)
 * [mcoroutine(协程实现)]()
 * [mtcp(可靠传输协议实现)]()
