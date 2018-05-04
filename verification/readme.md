@@ -3,6 +3,7 @@
 
 - [1. 说明](#1-说明)
 - [2. basic authentication](#2-basic-authentication)
+- [3. custom protocol authentication with tls](#3-custom-protocol-authentication-with-tls)
 
 <!-- /TOC -->
 
@@ -40,3 +41,9 @@ openssl req -new -x509 -days 365 -key fd.key -out fd.crt \
 sudo go run https_basic_authentication.go :20001
 ```
 
+<a id="markdown-3-custom-protocol-authentication-with-tls" name="3-custom-protocol-authentication-with-tls"></a>
+# 3. custom protocol authentication with tls
+
+在tls的基础上使用gob作为codec.简单的验证下用户和密码.
+
+但我不知道如何通过gob二进制码反射转换成不同的消息对象来dispatch,研究一下protobuf的方案再来思考这个问题 TODO!
