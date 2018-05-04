@@ -1,0 +1,21 @@
+syntax="proto3";
+package codec;
+
+message Query {
+  int64 id = 1;
+  string questioner = 2;
+
+  string question = 3;
+}
+
+message Answer {
+  int64 id =1;
+  string questioner = 2;
+  string answerer = 3;
+
+  string ansert = 4;
+}
+
+message Empty {
+    int32 id = 1;
+}

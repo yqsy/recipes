@@ -61,17 +61,18 @@
 ## 2.5. 其他
 
 * [incomplete_send(tcp发送数据不完整例子)](incomplete_send)
-* [connection_pool(连接池)]()
 * [identity_verification(通道身份验证)](verification)
 * [maxconnection(最大连接数)](maxconnection)
-* [heart_beat(心跳包)]()
+* [codec(编解码器)](codec)
+* heart_beat(心跳包)
+* connection_pool(连接池)
 * [idleconnection(空闲连接时间轮/堆/升序链表/多线程做法)](idleconnection)
 * [roundtrip(测时间差)](roundtrip)
-* [simple_rpc]()
-* [sudoku(数独)]()
+* simple_rpc
+* sudoku(数独)
 * [procmon(简易监控)](procmon)
-* [N皇后]()
-* [多机求解中位数]()
+* 多机并行N皇后
+* 多机求解中位数
 
 <a id="markdown-3-底层部分" name="3-底层部分"></a>
 # 3. 底层部分
@@ -79,5 +80,5 @@
 * [自旋锁/读写锁/信号量/互斥量/条件变量](sync)
 * [lock_free/wait_free](sync)
 * [blockqueue](blockqueue)
-* [mcoroutine(协程实现)]()
-* [mtcp(可靠传输协议实现)]()
+* mcoroutine(协程实现)
+* mtcp(可靠传输协议实现)
