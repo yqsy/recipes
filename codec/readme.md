@@ -2,6 +2,7 @@
 
 - [1. 说明](#1-说明)
 - [2. 实践](#2-实践)
+- [3. 反射的思路](#3-反射的思路)
 
 <!-- /TOC -->
 
@@ -56,3 +57,19 @@ protoc -I=./ --go_out=./go/ ./proto/query.proto
 # 生成c艹的代码
 protoc -I=./ --cpp_out=./cplusplus/ ./proto/query.proto
 ```
+
+<a id="markdown-3-反射的思路" name="3-反射的思路"></a>
+# 3. 反射的思路
+
+```bash
+# protobuf应该存在的键值对
+[Name:Descriptor] # DescriptorPool
+
+[Descriptor:Prototype] # MessageFactory
+
+# 注意每个message都有一个descriptor()指向pool的descriptor
+# 以及default_instance()指向pool的prototype.
+
+
+```
+

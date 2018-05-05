@@ -13,7 +13,7 @@ message Answer {
   string questioner = 2;
   string answerer = 3;
 
-  string ansert = 4;
+  string answer = 4;
 }
 
 message Empty {

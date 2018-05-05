@@ -119,7 +119,7 @@ const ::google::protobuf::uint32 TableStruct::offsets[] GOOGLE_PROTOBUF_ATTRIBUT
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::codec::Answer, id_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::codec::Answer, questioner_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::codec::Answer, answerer_),
-  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::codec::Answer, ansert_),
+  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::codec::Answer, answer_),
   ~0u,  // no _has_bits_
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::codec::Empty, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -164,7 +164,7 @@ void AddDescriptorsImpl() {
       "\n\021proto/query.proto\022\005codec\"9\n\005Query\022\n\n\002i"
       "d\030\001 \001(\003\022\022\n\nquestioner\030\002 \001(\t\022\020\n\010question\030"
       "\003 \001(\t\"J\n\006Answer\022\n\n\002id\030\001 \001(\003\022\022\n\nquestione"
-      "r\030\002 \001(\t\022\020\n\010answerer\030\003 \001(\t\022\016\n\006ansert\030\004 \001("
+      "r\030\002 \001(\t\022\020\n\010answerer\030\003 \001(\t\022\016\n\006answer\030\004 \001("
       "\t\"\023\n\005Empty\022\n\n\002id\030\001 \001(\005b\006proto3"
   };
   ::google::protobuf::DescriptorPool::InternalAddGeneratedFile(
@@ -546,7 +546,7 @@ void Answer::InitAsDefaultInstance() {
 const int Answer::kIdFieldNumber;
 const int Answer::kQuestionerFieldNumber;
 const int Answer::kAnswererFieldNumber;
-const int Answer::kAnsertFieldNumber;
+const int Answer::kAnswerFieldNumber;
 #endif  // !defined(_MSC_VER) || _MSC_VER >= 1900
 
 Answer::Answer()
@@ -570,9 +570,9 @@ Answer::Answer(const Answer& from)
   if (from.answerer().size() > 0) {
     answerer_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.answerer_);
   }
-  ansert_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-  if (from.ansert().size() > 0) {
-    ansert_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.ansert_);
+  answer_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+  if (from.answer().size() > 0) {
+    answer_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.answer_);
   }
   id_ = from.id_;
   // @@protoc_insertion_point(copy_constructor:codec.Answer)
@@ -581,7 +581,7 @@ Answer::Answer(const Answer& from)
 void Answer::SharedCtor() {
   questioner_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
   answerer_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-  ansert_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+  answer_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
   id_ = GOOGLE_LONGLONG(0);
   _cached_size_ = 0;
 }
@@ -594,7 +594,7 @@ Answer::~Answer() {
 void Answer::SharedDtor() {
   questioner_.DestroyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
   answerer_.DestroyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-  ansert_.DestroyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+  answer_.DestroyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
 }
 
 void Answer::SetCachedSize(int size) const {
@@ -628,7 +628,7 @@ void Answer::Clear() {
 
   questioner_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
   answerer_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
-  ansert_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+  answer_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
   id_ = GOOGLE_LONGLONG(0);
   _internal_metadata_.Clear();
 }
@@ -689,16 +689,16 @@ bool Answer::MergePartialFromCodedStream(
         break;
       }
 
-      // string ansert = 4;
+      // string answer = 4;
       case 4: {
         if (static_cast< ::google::protobuf::uint8>(tag) ==
             static_cast< ::google::protobuf::uint8>(34u /* 34 & 0xFF */)) {
           DO_(::google::protobuf::internal::WireFormatLite::ReadString(
-                input, this->mutable_ansert()));
+                input, this->mutable_answer()));
           DO_(::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-            this->ansert().data(), static_cast<int>(this->ansert().length()),
+            this->answer().data(), static_cast<int>(this->answer().length()),
             ::google::protobuf::internal::WireFormatLite::PARSE,
-            "codec.Answer.ansert"));
+            "codec.Answer.answer"));
         } else {
           goto handle_unusual;
         }
@@ -756,14 +756,14 @@ void Answer::SerializeWithCachedSizes(
       3, this->answerer(), output);
   }
 
-  // string ansert = 4;
-  if (this->ansert().size() > 0) {
+  // string answer = 4;
+  if (this->answer().size() > 0) {
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-      this->ansert().data(), static_cast<int>(this->ansert().length()),
+      this->answer().data(), static_cast<int>(this->answer().length()),
       ::google::protobuf::internal::WireFormatLite::SERIALIZE,
-      "codec.Answer.ansert");
+      "codec.Answer.answer");
     ::google::protobuf::internal::WireFormatLite::WriteStringMaybeAliased(
-      4, this->ansert(), output);
+      4, this->answer(), output);
   }
 
   if ((_internal_metadata_.have_unknown_fields() &&  ::google::protobuf::internal::GetProto3PreserveUnknownsDefault())) {
@@ -807,15 +807,15 @@ void Answer::SerializeWithCachedSizes(
         3, this->answerer(), target);
   }
 
-  // string ansert = 4;
-  if (this->ansert().size() > 0) {
+  // string answer = 4;
+  if (this->answer().size() > 0) {
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-      this->ansert().data(), static_cast<int>(this->ansert().length()),
+      this->answer().data(), static_cast<int>(this->answer().length()),
       ::google::protobuf::internal::WireFormatLite::SERIALIZE,
-      "codec.Answer.ansert");
+      "codec.Answer.answer");
     target =
       ::google::protobuf::internal::WireFormatLite::WriteStringToArray(
-        4, this->ansert(), target);
+        4, this->answer(), target);
   }
 
   if ((_internal_metadata_.have_unknown_fields() &&  ::google::protobuf::internal::GetProto3PreserveUnknownsDefault())) {
@@ -849,11 +849,11 @@ size_t Answer::ByteSizeLong() const {
         this->answerer());
   }
 
-  // string ansert = 4;
-  if (this->ansert().size() > 0) {
+  // string answer = 4;
+  if (this->answer().size() > 0) {
     total_size += 1 +
       ::google::protobuf::internal::WireFormatLite::StringSize(
-        this->ansert());
+        this->answer());
   }
 
   // int64 id = 1;
@@ -900,9 +900,9 @@ void Answer::MergeFrom(const Answer& from) {
 
     answerer_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.answerer_);
   }
-  if (from.ansert().size() > 0) {
+  if (from.answer().size() > 0) {
 
-    ansert_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.ansert_);
+    answer_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.answer_);
   }
   if (from.id() != 0) {
     set_id(from.id());
@@ -935,7 +935,7 @@ void Answer::InternalSwap(Answer* other) {
   using std::swap;
   questioner_.Swap(&other->questioner_);
   answerer_.Swap(&other->answerer_);
-  ansert_.Swap(&other->ansert_);
+  answer_.Swap(&other->answer_);
   swap(id_, other->id_);
   _internal_metadata_.Swap(&other->_internal_metadata_);
   swap(_cached_size_, other->_cached_size_);

@@ -31,7 +31,7 @@ func (m *Query) Reset()         { *m = Query{} }
 func (m *Query) String() string { return proto.CompactTextString(m) }
 func (*Query) ProtoMessage()    {}
 func (*Query) Descriptor() ([]byte, []int) {
-	return fileDescriptor_query_edd06816281c873f, []int{0}
+	return fileDescriptor_query_9a249362ecaed7bc, []int{0}
 }
 func (m *Query) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Query.Unmarshal(m, b)
@@ -76,7 +76,7 @@ type Answer struct {
 	Id                   int64    `protobuf:"varint,1,opt,name=id" json:"id,omitempty"`
 	Questioner           string   `protobuf:"bytes,2,opt,name=questioner" json:"questioner,omitempty"`
 	Answerer             string   `protobuf:"bytes,3,opt,name=answerer" json:"answerer,omitempty"`
-	Ansert               string   `protobuf:"bytes,4,opt,name=ansert" json:"ansert,omitempty"`
+	Answer               string   `protobuf:"bytes,4,opt,name=answer" json:"answer,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -86,7 +86,7 @@ func (m *Answer) Reset()         { *m = Answer{} }
 func (m *Answer) String() string { return proto.CompactTextString(m) }
 func (*Answer) ProtoMessage()    {}
 func (*Answer) Descriptor() ([]byte, []int) {
-	return fileDescriptor_query_edd06816281c873f, []int{1}
+	return fileDescriptor_query_9a249362ecaed7bc, []int{1}
 }
 func (m *Answer) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Answer.Unmarshal(m, b)
@@ -127,9 +127,9 @@ func (m *Answer) GetAnswerer() string {
 	return ""
 }
 
-func (m *Answer) GetAnsert() string {
+func (m *Answer) GetAnswer() string {
 	if m != nil {
-		return m.Ansert
+		return m.Answer
 	}
 	return ""
 }
@@ -145,7 +145,7 @@ func (m *Empty) Reset()         { *m = Empty{} }
 func (m *Empty) String() string { return proto.CompactTextString(m) }
 func (*Empty) ProtoMessage()    {}
 func (*Empty) Descriptor() ([]byte, []int) {
-	return fileDescriptor_query_edd06816281c873f, []int{2}
+	return fileDescriptor_query_9a249362ecaed7bc, []int{2}
 }
 func (m *Empty) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Empty.Unmarshal(m, b)
@@ -178,10 +178,10 @@ func init() {
 	proto.RegisterType((*Empty)(nil), "codec.Empty")
 }
 
-func init() { proto.RegisterFile("proto/query.proto", fileDescriptor_query_edd06816281c873f) }
+func init() { proto.RegisterFile("proto/query.proto", fileDescriptor_query_9a249362ecaed7bc) }
 
-var fileDescriptor_query_edd06816281c873f = []byte{
-	// 160 bytes of a gzipped FileDescriptorProto
+var fileDescriptor_query_9a249362ecaed7bc = []byte{
+	// 156 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x12, 0x2c, 0x28, 0xca, 0x2f,
 	0xc9, 0xd7, 0x2f, 0x2c, 0x4d, 0x2d, 0xaa, 0xd4, 0x03, 0xb3, 0x85, 0x58, 0x93, 0xf3, 0x53, 0x52,
 	0x93, 0x95, 0x82, 0xb9, 0x58, 0x03, 0x41, 0xa2, 0x42, 0x7c, 0x5c, 0x4c, 0x99, 0x29, 0x12, 0x8c,
@@ -189,7 +189,7 @@ var fileDescriptor_query_edd06816281c873f = []byte{
 	0x25, 0x99, 0xf9, 0x79, 0xa9, 0x45, 0x12, 0x4c, 0x0a, 0x8c, 0x1a, 0x9c, 0x41, 0x48, 0x22, 0x42,
 	0x52, 0x5c, 0x1c, 0x30, 0x9e, 0x04, 0x33, 0x58, 0x16, 0xce, 0x57, 0xca, 0xe1, 0x62, 0x73, 0xcc,
 	0x2b, 0x2e, 0x4f, 0x2d, 0x22, 0xc7, 0xd4, 0x44, 0xb0, 0xce, 0xd4, 0x22, 0x98, 0xa9, 0x30, 0xbe,
-	0x90, 0x18, 0x17, 0x5b, 0x62, 0x5e, 0x71, 0x6a, 0x51, 0x89, 0x04, 0x0b, 0x58, 0x06, 0xca, 0x53,
-	0x12, 0xe7, 0x62, 0x75, 0xcd, 0x2d, 0x28, 0x41, 0xf6, 0x02, 0x2b, 0xc8, 0xb2, 0x24, 0x36, 0xb0,
-	0x4f, 0x8d, 0x01, 0x01, 0x00, 0x00, 0xff, 0xff, 0x08, 0x9c, 0x61, 0x46, 0xfe, 0x00, 0x00, 0x00,
+	0x90, 0x18, 0x17, 0x1b, 0x84, 0x2d, 0xc1, 0x02, 0x96, 0x81, 0xf2, 0x94, 0xc4, 0xb9, 0x58, 0x5d,
+	0x73, 0x0b, 0x4a, 0x90, 0xbd, 0xc0, 0x0a, 0xb2, 0x2c, 0x89, 0x0d, 0xec, 0x53, 0x63, 0x40, 0x00,
+	0x00, 0x00, 0xff, 0xff, 0xcb, 0x6e, 0x40, 0x33, 0xfe, 0x00, 0x00, 0x00,
 }

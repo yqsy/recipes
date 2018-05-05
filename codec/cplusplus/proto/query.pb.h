@@ -308,19 +308,19 @@ class Answer : public ::google::protobuf::Message /* @@protoc_insertion_point(cl
   ::std::string* release_answerer();
   void set_allocated_answerer(::std::string* answerer);
 
-  // string ansert = 4;
-  void clear_ansert();
-  static const int kAnsertFieldNumber = 4;
-  const ::std::string& ansert() const;
-  void set_ansert(const ::std::string& value);
+  // string answer = 4;
+  void clear_answer();
+  static const int kAnswerFieldNumber = 4;
+  const ::std::string& answer() const;
+  void set_answer(const ::std::string& value);
   #if LANG_CXX11
-  void set_ansert(::std::string&& value);
+  void set_answer(::std::string&& value);
   #endif
-  void set_ansert(const char* value);
-  void set_ansert(const char* value, size_t size);
-  ::std::string* mutable_ansert();
-  ::std::string* release_ansert();
-  void set_allocated_ansert(::std::string* ansert);
+  void set_answer(const char* value);
+  void set_answer(const char* value, size_t size);
+  ::std::string* mutable_answer();
+  ::std::string* release_answer();
+  void set_allocated_answer(::std::string* answer);
 
   // int64 id = 1;
   void clear_id();
@@ -334,7 +334,7 @@ class Answer : public ::google::protobuf::Message /* @@protoc_insertion_point(cl
   ::google::protobuf::internal::InternalMetadataWithArena _internal_metadata_;
   ::google::protobuf::internal::ArenaStringPtr questioner_;
   ::google::protobuf::internal::ArenaStringPtr answerer_;
-  ::google::protobuf::internal::ArenaStringPtr ansert_;
+  ::google::protobuf::internal::ArenaStringPtr answer_;
   ::google::protobuf::int64 id_;
   mutable int _cached_size_;
   friend struct ::protobuf_proto_2fquery_2eproto::TableStruct;
@@ -694,57 +694,57 @@ inline void Answer::set_allocated_answerer(::std::string* answerer) {
   // @@protoc_insertion_point(field_set_allocated:codec.Answer.answerer)
 }
 
-// string ansert = 4;
-inline void Answer::clear_ansert() {
-  ansert_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+// string answer = 4;
+inline void Answer::clear_answer() {
+  answer_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
 }
-inline const ::std::string& Answer::ansert() const {
-  // @@protoc_insertion_point(field_get:codec.Answer.ansert)
-  return ansert_.GetNoArena();
+inline const ::std::string& Answer::answer() const {
+  // @@protoc_insertion_point(field_get:codec.Answer.answer)
+  return answer_.GetNoArena();
 }
-inline void Answer::set_ansert(const ::std::string& value) {
+inline void Answer::set_answer(const ::std::string& value) {
   
-  ansert_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), value);
-  // @@protoc_insertion_point(field_set:codec.Answer.ansert)
+  answer_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), value);
+  // @@protoc_insertion_point(field_set:codec.Answer.answer)
 }
 #if LANG_CXX11
-inline void Answer::set_ansert(::std::string&& value) {
+inline void Answer::set_answer(::std::string&& value) {
   
-  ansert_.SetNoArena(
+  answer_.SetNoArena(
     &::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::move(value));
-  // @@protoc_insertion_point(field_set_rvalue:codec.Answer.ansert)
+  // @@protoc_insertion_point(field_set_rvalue:codec.Answer.answer)
 }
 #endif
-inline void Answer::set_ansert(const char* value) {
+inline void Answer::set_answer(const char* value) {
   GOOGLE_DCHECK(value != NULL);
   
-  ansert_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
-  // @@protoc_insertion_point(field_set_char:codec.Answer.ansert)
+  answer_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
+  // @@protoc_insertion_point(field_set_char:codec.Answer.answer)
 }
-inline void Answer::set_ansert(const char* value, size_t size) {
+inline void Answer::set_answer(const char* value, size_t size) {
   
-  ansert_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
+  answer_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
       ::std::string(reinterpret_cast<const char*>(value), size));
-  // @@protoc_insertion_point(field_set_pointer:codec.Answer.ansert)
+  // @@protoc_insertion_point(field_set_pointer:codec.Answer.answer)
 }
-inline ::std::string* Answer::mutable_ansert() {
+inline ::std::string* Answer::mutable_answer() {
   
-  // @@protoc_insertion_point(field_mutable:codec.Answer.ansert)
-  return ansert_.MutableNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+  // @@protoc_insertion_point(field_mutable:codec.Answer.answer)
+  return answer_.MutableNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
 }
-inline ::std::string* Answer::release_ansert() {
-  // @@protoc_insertion_point(field_release:codec.Answer.ansert)
+inline ::std::string* Answer::release_answer() {
+  // @@protoc_insertion_point(field_release:codec.Answer.answer)
   
-  return ansert_.ReleaseNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+  return answer_.ReleaseNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
 }
-inline void Answer::set_allocated_ansert(::std::string* ansert) {
-  if (ansert != NULL) {
+inline void Answer::set_allocated_answer(::std::string* answer) {
+  if (answer != NULL) {
     
   } else {
     
   }
-  ansert_.SetAllocatedNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ansert);
-  // @@protoc_insertion_point(field_set_allocated:codec.Answer.ansert)
+  answer_.SetAllocatedNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), answer);
+  // @@protoc_insertion_point(field_set_allocated:codec.Answer.answer)
 }
 
 // -------------------------------------------------------------------
