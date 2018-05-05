@@ -71,5 +71,6 @@ protoc -I=./ --cpp_out=./cplusplus/ ./proto/query.proto
 # 以及default_instance()指向pool的prototype.
 
 
+# 相同类型的对象具有统一的descriptor (prototype也可以)
+message->GetDescriptor()
 ```
-

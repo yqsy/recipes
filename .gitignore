@@ -301,3 +301,5 @@ pingpong/libevent/bench.sh
 http_bench/go/server
 verification/simple_tls_authentication/server/fd.crt
 verification/simple_tls_authentication/server/fd.key
+codec/cplusplus/client
+codec/cplusplus/server
