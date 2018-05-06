@@ -70,16 +70,15 @@ protoc -I=./ --cpp_out=./cplusplus/ ./proto/query.proto
 
 c++
 ```c++
-// c++的做法(我想应该是每个类型都有全局唯一的指针,把类型相关的信息写在里面)
+// [类型的descriptor:typeName]
 typedef codec::Query T;
 std::string type_name = T::descriptor()->full_name();
 ```
 
 go
 ```go
-// 其实和c++差不多,在package内会存储类型相关的信息,通过一个专门的package来转换成结构体
-fd, md := descriptor.ForMessage(&codec.Query{})
-typeName := fd.GetPackage() + "." + md.GetName()
+// [类型变量:typeName]
+typeName := proto.MessageName(&codec.Query{})
 fmt.Println(typeName)
 ```
 
@@ -95,7 +94,6 @@ c++
 // 存在的键值对为
 // [Name:Descriptor] # DescriptorPool
 // [Descriptor:Prototype] # MessageFactory
-
 
 google::protobuf::Message *createMessage(const std::string &typeName) {
     google::protobuf::Message *message = nullptr;
@@ -114,7 +112,7 @@ google::protobuf::Message *createMessage(const std::string &typeName) {
 go 
 ```go
 // go并没有使用设计模式,因为其可以将类型当做变量一样使用
-// 建立映射 typeName -> 类型变量
+// 建立映射 [typeName:类型变量]
 // 直接可以从类型变量生成新的对象
 
 func createMessage(typeName string) (interface{}, error) {
@@ -158,6 +156,21 @@ gb.callbacksMap[codec::Query::descriptor()] = new CallbackT<codec::Query>(fooQue
 
 go
 ```go
+// 在go里面,类型也是变量,所以直接用类型作为key,回调作为接口
+type Callback func(message proto.Message)
+callbacks := make(map[interface{}]Callback)
+callbacks[reflect.TypeOf((*codec.Query)(nil))] = fooQuery
+
+cb := callbacks[reflect.TypeOf(msg)]
+    
+cb(msg.(proto.Message))    
 
 
+// 美中不足的是go没有泛型,在回调函数中自己向下吧!
+// 或者像grpc一样自动生成模板代码
+func fooQuery(message proto.Message) {
+	query := message.(*codec.Query)
+	_ = query
+	fmt.Println("query")
+}
 ```
