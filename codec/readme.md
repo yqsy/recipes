@@ -2,7 +2,10 @@
 
 - [1. 说明](#1-说明)
 - [2. 实践](#2-实践)
-- [3. 反射的思路](#3-反射的思路)
+- [3. 反射的思路(三个思考切入点)](#3-反射的思路三个思考切入点)
+    - [3.1. 如何通过类型获得类型名称](#31-如何通过类型获得类型名称)
+    - [3.2. 如何通过类型名称创建类型并反序列化](#32-如何通过类型名称创建类型并反序列化)
+    - [3.3. 如何通过类型dispatch到不同的入口函数内](#33-如何通过类型dispatch到不同的入口函数内)
 
 <!-- /TOC -->
 
@@ -58,19 +61,103 @@ protoc -I=./ --go_out=./go/ ./proto/query.proto
 protoc -I=./ --cpp_out=./cplusplus/ ./proto/query.proto
 ```
 
-<a id="markdown-3-反射的思路" name="3-反射的思路"></a>
-# 3. 反射的思路
+<a id="markdown-3-反射的思路三个思考切入点" name="3-反射的思路三个思考切入点"></a>
+# 3. 反射的思路(三个思考切入点)
 
-```bash
-# protobuf应该存在的键值对
-[Name:Descriptor] # DescriptorPool
+ 
+<a id="markdown-31-如何通过类型获得类型名称" name="31-如何通过类型获得类型名称"></a>
+## 3.1. 如何通过类型获得类型名称
 
-[Descriptor:Prototype] # MessageFactory
+c++
+```c++
+// c++的做法(我想应该是每个类型都有全局唯一的指针,把类型相关的信息写在里面)
+typedef codec::Query T;
+std::string type_name = T::descriptor()->full_name();
+```
 
-# 注意每个message都有一个descriptor()指向pool的descriptor
-# 以及default_instance()指向pool的prototype.
+go
+```go
+// 其实和c++差不多,在package内会存储类型相关的信息,通过一个专门的package来转换成结构体
+fd, md := descriptor.ForMessage(&codec.Query{})
+typeName := fd.GetPackage() + "." + md.GetName()
+fmt.Println(typeName)
+```
 
 
-# 相同类型的对象具有统一的descriptor (prototype也可以)
-message->GetDescriptor()
+<a id="markdown-32-如何通过类型名称创建类型并反序列化" name="32-如何通过类型名称创建类型并反序列化"></a>
+## 3.2. 如何通过类型名称创建类型并反序列化
+
+c++
+```c++
+// c++ 用到了prototype设计模式
+
+// 通过hash的手段完成 typeName -> descriptor -> prototype -> New对象
+// 存在的键值对为
+// [Name:Descriptor] # DescriptorPool
+// [Descriptor:Prototype] # MessageFactory
+
+
+google::protobuf::Message *createMessage(const std::string &typeName) {
+    google::protobuf::Message *message = nullptr;
+
+    auto descriptor = google::protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(typeName);
+    if (descriptor) {
+        auto prototype = google::protobuf::MessageFactory::generated_factory()->GetPrototype(descriptor);
+        if (prototype) {
+            message = prototype->New();
+        }
+    }
+    return message;
+}
+```
+
+go 
+```go
+// go并没有使用设计模式,因为其可以将类型当做变量一样使用
+// 建立映射 typeName -> 类型变量
+// 直接可以从类型变量生成新的对象
+
+func createMessage(typeName string) (interface{}, error) {
+	mt := proto.MessageType(typeName)
+	if mt == nil {
+		fmt.Errorf("unknown message type %q", typeName)
+	}
+
+	return reflect.New(mt.Elem()).Interface(), nil
+}
+
+
+// 映射关系
+func init() {
+	proto.RegisterType((*Query)(nil), "codec.Query")
+	proto.RegisterType((*Answer)(nil), "codec.Answer")
+	proto.RegisterType((*Empty)(nil), "codec.Empty")
+}
+```
+
+
+<a id="markdown-33-如何通过类型dispatch到不同的入口函数内" name="33-如何通过类型dispatch到不同的入口函数内"></a>
+## 3.3. 如何通过类型dispatch到不同的入口函数内
+
+第二个步骤之后c++得到`google::protobuf::Message *`,而go得到`interface{}`.然而这只是消息的一个`抽象`,如何知道它实际是什么?从而分发到不同的函数去处理?
+
+c++
+```c++
+// 基类带有一个获取到Descriptor指针的函数
+google::protobuf::Message::GetDescriptor()
+
+// 那么就只要做一个Descriptor与函数的映射关系即可
+std::unordered_map<const google::protobuf::Descriptor *, Callback *> callbacksMap;
+
+// 回调函数
+void fooQuery(int sockfd, codec::Query *query)
+
+// 用模板保存类型
+gb.callbacksMap[codec::Query::descriptor()] = new CallbackT<codec::Query>(fooQuery)
+```
+
+go
+```go
+
+
 ```
