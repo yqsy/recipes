@@ -77,7 +77,7 @@
 <a id="markdown-3-底层部分" name="3-底层部分"></a>
 # 3. 底层部分
 
-* [自旋锁/读写锁/信号量/互斥量/条件变量](sync)
+* [自旋锁/互斥量/条件变量](sync)
 * [lock_free/wait_free](sync)
 * [blockqueue](blockqueue)
 * mcoroutine(协程实现)
