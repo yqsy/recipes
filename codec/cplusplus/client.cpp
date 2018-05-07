@@ -45,15 +45,14 @@ int main() {
 
     if (!writeAMessage(query, sockfd)) {
         panic("write packet error");
-    } else {
-        auto message = readAMessage(sockfd);
-
-        if (!message) {
-            panic("readAMessage error");
-        } else {
-            codec::Answer *answer = dynamic_cast<codec::Answer *>(&*message);
-            printf("%s\n", answer->answer().c_str());
-        }
-
     }
+
+    auto message = readAMessage(sockfd);
+
+    if (!message) {
+        panic("readAMessage error");
+    }
+
+    codec::Answer *answer = dynamic_cast<codec::Answer *>(&*message);
+    printf("%s\n", answer->answer().c_str());
 }

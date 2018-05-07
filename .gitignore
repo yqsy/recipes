@@ -303,3 +303,5 @@ verification/simple_tls_authentication/server/fd.crt
 verification/simple_tls_authentication/server/fd.key
 codec/cplusplus/client
 codec/cplusplus/server
+codec/cplusplus/test_prototype
+

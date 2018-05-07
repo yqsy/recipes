@@ -5,6 +5,9 @@ import (
 	"os"
 	"fmt"
 	"log"
+	"github.com/yqsy/recipes/codec/go/proto"
+	"github.com/yqsy/recipes/codec/go/common"
+	"bufio"
 )
 
 var usage = `Usage:
@@ -18,6 +21,22 @@ type Context struct {
 func serve(ctx *Context) {
 	defer ctx.conn.Close()
 
+	query := &codec.Query{}
+	query.Question = "hot are you?"
+
+	err := common.WriteAMessage(ctx.conn, query)
+	if err != nil {
+		panic("write packet error")
+	}
+	bufReader := bufio.NewReader(ctx.conn)
+
+	message, err := common.ReadAMessage(bufReader)
+
+	if err != nil {
+		panic(err)
+	}
+
+	log.Printf("%v \n", message.(*codec.Answer).Answer)
 }
 
 func main() {

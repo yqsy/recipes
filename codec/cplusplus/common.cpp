@@ -127,10 +127,10 @@ bool writeAMessage(const google::protobuf::Message &message, int sockfd) {
 
     auto typeName = message.GetTypeName() + "\0";
     int32_t nameLen = typeName.length() + 1 /*fuck c style string*/;
-    int32_t protobufSize = message.ByteSize();
+    int32_t protobufLen = message.ByteSize();
     int32_t checkSum = 0;
 
-    int32_t len = sizeof(nameLen) + nameLen + protobufSize + sizeof(checkSum);
+    int32_t len = sizeof(nameLen) + nameLen + protobufLen + sizeof(checkSum);
 
     int32_t bufLen = len + sizeof(len);
 
@@ -145,7 +145,7 @@ bool writeAMessage(const google::protobuf::Message &message, int sockfd) {
     p += nameLen;
     auto end = message.SerializeWithCachedSizesToArray(reinterpret_cast<uint8_t *>(p));
 
-    if (reinterpret_cast<char *>(end) - p != protobufSize) {
+    if (reinterpret_cast<char *>(end) - p != protobufLen) {
         return false;
     }
 
