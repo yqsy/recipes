@@ -7,6 +7,7 @@
     - [2.3. benchmark](#23-benchmark)
     - [2.4. chat](#24-chat)
     - [2.5. 其他](#25-其他)
+    - [2.6. 特性](#26-特性)
 - [3. 底层部分](#3-底层部分)
 
 <!-- /TOC -->
@@ -73,6 +74,12 @@
 * [procmon(简易监控)](procmon)
 * 多机并行N皇后
 * 多机求解中位数
+
+<a id="markdown-26-特性" name="26-特性"></a>
+## 2.6. 特性
+
+* [SO_REUSEADDR/TIME_WAIT](so_reuseaddr)
+* [SO_REUSEPORT](so_reuseport)
 
 <a id="markdown-3-底层部分" name="3-底层部分"></a>
 # 3. 底层部分
