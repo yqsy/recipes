@@ -305,3 +305,8 @@ codec/cplusplus/client
 codec/cplusplus/server
 codec/cplusplus/test_prototype
 
+cgi/bin/webserver
+cgi/bin/cgi
+cgi/bin/cgi.sqlite
+cgi/bin/cgi.db
+cgi/bin/index.html

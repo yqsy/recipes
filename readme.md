@@ -74,6 +74,8 @@
 * [procmon(简易监控)](procmon)
 * 多机并行N皇后
 * 多机求解中位数
+* [cgi留言板](cgi)
+* [fastcgi](fastcgi)
 
 <a id="markdown-26-特性" name="26-特性"></a>
 ## 2.6. 特性
