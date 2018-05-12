@@ -4,10 +4,18 @@ import (
 	"net/http"
 	"fmt"
 	"os"
+	"net/http/httputil"
 )
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "%s", r.URL.Path[1:])
+	requestDump, err := httputil.DumpRequest(r, true)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println(string(requestDump))
 }
 
 func main() {
