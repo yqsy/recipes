@@ -5,11 +5,11 @@ import (
 	"log"
 	"database/sql"
 	_ "github.com/mattn/go-sqlite3"
-	"fmt"
 	"strconv"
 	"io"
 	"encoding/json"
 	"time"
+	"fmt"
 )
 
 type PostMessage struct {
@@ -25,26 +25,16 @@ func main() {
 	method := os.Getenv("REQUEST_METHOD")
 	logger.Printf("REQUEST_METHOD: %v\n", method)
 
-	fmt.Printf(`Content-type:text/html
-
-<html>
-<head>
-<meta charset="utf-8">
-<title></title>
-</head>
-<body>
-`)
-
 	dispatch(method, logger)
-
-	fmt.Printf(`</body>
-</html>
-`)
-
 }
 
 func dispatch(method string, logger *log.Logger) {
+
 	if method == "GET" {
+
+		fmt.Printf(`<meta charset="utf-8">
+`)
+
 		queryStr := os.Getenv("QUERY_STRING")
 		logger.Printf("QUERY_STRING: %v\n", queryStr)
 
@@ -56,9 +46,37 @@ func dispatch(method string, logger *log.Logger) {
 
 		defer db.Close()
 
+		rows, err := db.Query("select title,body,create_time from message order by create_time desc")
+		if err != nil {
+			fmt.Printf("<p>db.Query error: %v</p>\n", err)
+			return
+		}
 
+		defer rows.Close()
+
+		var result []string
+
+		for rows.Next() {
+			var title string
+			var body string
+			var createTime int
+			err = rows.Scan(&title, &body, &createTime)
+
+			if err != nil {
+				fmt.Printf("<p>rows.Scan: %v</p>\n", err)
+				return
+			}
+			result = append(result, fmt.Sprintf("title:%v body:%v time:%v", title, body, time.Unix(int64(createTime), 0).Format(time.RFC822)))
+		}
+
+		for _, val := range result {
+			fmt.Printf("<p>%v</p>\n", val)
+		}
 
 	} else if method == "POST" {
+		fmt.Printf(`<meta charset="utf-8">
+`)
+
 		contentLengthStr := os.Getenv("CONTENT_LENGTH")
 		logger.Printf("contentLength: %v\n", contentLengthStr)
 
@@ -96,11 +114,26 @@ func dispatch(method string, logger *log.Logger) {
 
 		defer db.Close()
 
-		tx, _ := db.Begin()
-		stmt, _ := tx.Prepare("insert into message(title,body, create_time) values(?,?,?)")
+		tx, err := db.Begin()
+		if err != nil {
+			fmt.Printf("<p>db.Begin error: %v</p>\n", err)
+			return
+		}
+
+		stmt, err := tx.Prepare("insert into message(title,body, create_time) values(?,?,?)")
+		if err != nil {
+			fmt.Printf("<p>tx.Prepare error: %v</p>\n", err)
+			return
+		}
+
 		defer stmt.Close()
 		_, err = stmt.Exec(postMessage.Title, postMessage.Body, time.Now().Unix())
-		tx.Commit()
+		if err != nil {
+			fmt.Printf("<p>stmt.Exec error: %v</p>\n", err)
+			return
+		}
+
+		err = tx.Commit()
 
 		if err != nil {
 			fmt.Printf("<p>insert error: %v</p>\n", err)
@@ -108,5 +141,7 @@ func dispatch(method string, logger *log.Logger) {
 		}
 
 		fmt.Printf("<p>insert ok</p>\n")
+	} else {
+		fmt.Printf("<p>unsoppered</p>\n")
 	}
 }
