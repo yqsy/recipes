@@ -70,7 +70,7 @@
 * [idleconnection(空闲连接时间轮/堆/升序链表/多线程做法)](idleconnection)
 * [roundtrip(测时间差)](roundtrip)
 * simple_rpc
-* sudoku(数独)
+* [sudoku负载均衡](sudoku)
 * [procmon(简易监控)](procmon)
 * 多机并行N皇后
 * 多机求解中位数
