@@ -2,9 +2,15 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"net/http"
 	"github.com/yqsy/algorithm/sudoku/sudoku_extra"
+	"net/http"
+	"os"
+	"fmt"
 )
+
+var usage = `Usage:
+%v listenAddr
+`
 
 func serveSudoku(c *gin.Context) {
 	subject := c.Param("subject")
@@ -28,7 +34,15 @@ func serveSudoku(c *gin.Context) {
 }
 
 func main() {
+	arg := os.Args
+	usage = fmt.Sprintf(usage, arg[0])
+
+	if len(arg) < 2 {
+		fmt.Printf(usage)
+		return
+	}
+
 	r := gin.Default()
 	r.GET("/sudoku/:subject", serveSudoku)
-	r.Run(":20000") // listen and serve on 0.0.0.0:8080
+	r.Run(arg[1])
 }
