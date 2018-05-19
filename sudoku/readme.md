@@ -94,12 +94,12 @@ loadtest.cc|性能测试,延迟,最小,最大,平均,中位数, 延迟分布
 直接求解和通过网络求解的对比
 
 ```bash
-网路服务:
-go run sudoku.go :20000 > /dev/null 2>&1
+# 网络服务
+go run sudokuserver.go :20000 > /dev/null 2>&1
 
 ab -n 100000 -c 1 -k http://localhost:20000/sudoku/080001030500804706000270000920400003103958402400002089000029000305106008040300010
 
-直接测试:
+# 直接测试
 go run direct_solve.go 100000 080001030500804706000270000920400003103958402400002089000029000305106008040300010
 ```
 
@@ -111,11 +111,62 @@ go run direct_solve.go 100000 08000103050080470600027000092040000310395840240000
 
 * https://segmentfault.com/q/1010000008852127/a-1020000008855812 (ab的计算公式)
 ```bash
+mkdir -p bin
 
+cd sudokuserver
+go build sudokuserver.go
+mv sudokuserver ../bin
+
+cd ../sudokuloadtest
+go build sudokuloadtest.go
+mv sudokuloadtest ../bin
+cd ../bin
+
+
+problem=080001030500804706000270000920400003103958402400002089000029000305106008040300010
+dest=127.0.0.1:20000 
+host=:20000
+
+for connections in 1 10 100 1000 3000 5000 8000 10000; do
+    for qps in 10000; do
+        taskset -c 1 ./sudokuserver  $host > /dev/null 2>&1 & serverpid=$!
+        sleep 2
+        ./sudokuloadtest $dest $qps $connections $problem & clientpid=$!
+        sleep 5
+        kill -9 $serverpid $clientpid
+        sleep 3
+    done
+done
 ```
 
-服务端请求/延时状态查看
+
+客户端角度的延迟会大大的下降
+![](sudokulatency.png)
+![](sudokuthroughputs.png)
+
+nginx负载均衡测试,是否能水平扩展   
+结论:单机上面不容易测试,下次有机会多机器测试!  
+
 ```bash
+sudo mv  /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+sudo cp ./nginx.conf /etc/nginx/nginx.conf
+sudo nginx
 
+problem=080001030500804706000270000920400003103958402400002089000029000305106008040300010
+dest=127.0.0.1:20000 
+host=:20000
 
+for connections in 1 10 100 1000 3000 5000 8000 10000; do
+    for qps in 10000; do
+        taskset -c 1 ./sudokuserver :20001 > /dev/null 2>&1 & serverpid1=$!
+        taskset -c 2 ./sudokuserver :20002 > /dev/null 2>&1 & serverpid2=$!
+        taskset -c 3 ./sudokuserver :20003 > /dev/null 2>&1 & serverpid3=$!
+        taskset -c 4 ./sudokuserver :20004 > /dev/null 2>&1 & serverpid4=$!
+        sleep 2
+        ./sudokuloadtest $dest $qps $connections $problem & clientpid=$!
+        sleep 5
+        kill -9 $clientpid $serverpid1 $serverpid2 $serverpid3 $serverpid4
+        sleep 3
+    done
+done
 ```

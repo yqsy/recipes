@@ -52,18 +52,18 @@ func runClient(ctx *Context) {
 
 	// 每秒钟增加发送数
 	go func() {
-		ticker := time.NewTicker(time.Millisecond * 100)
+		ticker := time.NewTicker(time.Second)
 		for {
 			select {
 			case <-ticker.C:
-				atomic.AddInt64(ctx.currentSend, int64(ctx.qps/10))
+				atomic.AddInt64(ctx.currentSend, int64(ctx.qps))
 			}
 		}
 	}()
 
 	time.Sleep(time.Millisecond * 10)
 
-	ticker := time.NewTicker(time.Millisecond * 100)
+	ticker := time.NewTicker(time.Second)
 
 	for {
 		select {
@@ -108,6 +108,13 @@ func main() {
 
 	problem := arg[4]
 
+	verbose := false
+	if len(arg) > 5 {
+		if arg[5] == "-v" {
+			verbose = true
+		}
+	}
+
 	log.Printf("connectAddr: %v qps: %v connections:%v\n", connectAddr, qps, connections)
 
 	ctxs := make([]*Context, 0)
@@ -132,6 +139,8 @@ func main() {
 		go runClient(ctx)
 	}
 
+	time.Sleep(time.Second)
+
 	ticker := time.NewTicker(time.Second)
 
 	// 每一次快照的分布都写到文件内
@@ -151,9 +160,11 @@ func main() {
 				len(latencies), min, max, mean, median, p90, p99)
 			log.Printf(report)
 
-			fileCount += 1
-			fileName := fmt.Sprintf("r%04d", fileCount)
-			writeToFile(fileName, report, latencies)
+			if verbose {
+				fileCount += 1
+				fileName := fmt.Sprintf("r%04d", fileCount)
+				writeToFile(fileName, report, latencies)
+			}
 		}
 	}
 }
@@ -245,6 +256,9 @@ func getSum(s []int) int {
 }
 
 func getMean(s []int) int {
+	if len(s) == 0 {
+		return 0
+	}
 	return getSum(s) / int(len(s))
 }
 
