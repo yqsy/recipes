@@ -170,3 +170,9 @@ for connections in 1 10 100 1000 3000 5000 8000 10000; do
     done
 done
 ```
+
+生成直方图
+```
+gnuplot
+plot 'r0003' using 1:2 with boxes
+```

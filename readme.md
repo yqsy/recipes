@@ -73,7 +73,8 @@
 * [sudoku负载均衡](sudoku)
 * [procmon(简易监控)](procmon)
 * 多机并行N皇后
-* 多机求解中位数
+* 多机求解中位数,平均数
+* 找出出现频率最高的单词
 * [cgi留言板](cgi)
 * [fastcgi](fastcgi)
 
