@@ -7,11 +7,12 @@ import (
 	"net/http"
 	"time"
 	"sync/atomic"
+	"sync"
+	"log"
 	"io"
 	"io/ioutil"
-	"sync"
 	"sort"
-	"log"
+	_ "net/http/pprof"
 )
 
 var usage = `Usage:
@@ -116,6 +117,10 @@ func main() {
 	}
 
 	log.Printf("connectAddr: %v qps: %v connections:%v\n", connectAddr, qps, connections)
+
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	ctxs := make([]*Context, 0)
 	for i := 0; i < connections; i++ {

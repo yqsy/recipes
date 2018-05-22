@@ -7,7 +7,8 @@
     - [2.3. benchmark](#23-benchmark)
     - [2.4. chat](#24-chat)
     - [2.5. 其他](#25-其他)
-    - [2.6. 特性](#26-特性)
+    - [2.6. 测试框架](#26-测试框架)
+    - [2.7. 特性](#27-特性)
 - [3. 底层部分](#3-底层部分)
 
 <!-- /TOC -->
@@ -72,14 +73,16 @@
 * simple_rpc
 * [sudoku负载均衡](sudoku)
 * [procmon(简易监控)](procmon)
-* 多机并行N皇后
-* 多机求解中位数,平均数
-* 找出出现频率最高的单词
 * [cgi留言板](cgi)
 * [fastcgi](fastcgi)
 
-<a id="markdown-26-特性" name="26-特性"></a>
-## 2.6. 特性
+<a id="markdown-26-测试框架" name="26-测试框架"></a>
+## 2.6. 测试框架
+
+* [grpc_sudoku](grpc/sudoku)
+
+<a id="markdown-27-特性" name="27-特性"></a>
+## 2.7. 特性
 
 * [SO_REUSEADDR/TIME_WAIT](so_reuseaddr)
 * [SO_REUSEPORT](so_reuseport)

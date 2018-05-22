@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package sudoku_protocol;
+
+service SudokuSolver {
+    rpc Solve (SolveRequest) returns (SolveReply) {}
+}
+
+message SolveRequest {
+    string problem = 1;
+}
+
+message SolveReply {
+    bool ok = 1;
+    string result = 2;
+}
