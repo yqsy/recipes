@@ -15,9 +15,9 @@ var usage = `Usage:
 %v listenAddr
 `
 
-type server struct{}
+type Handler struct{}
 
-func (s *server) Solve(ctx context.Context, in *pb.SolveRequest) (*pb.SolveReply, error) {
+func (s *Handler) Solve(ctx context.Context, in *pb.SolveRequest) (*pb.SolveReply, error) {
 
 	table, err := sudoku_extra.ConvertLineToTable(in.Problem)
 	if err != nil {
@@ -47,7 +47,7 @@ func main() {
 	}
 
 	s := grpc.NewServer()
-	pb.RegisterSudokuSolverServer(s, &server{})
+	pb.RegisterSudokuSolverServer(s, &Handler{})
 	reflection.Register(s)
 	if err := s.Serve(listener); err != nil {
 		panic(err)

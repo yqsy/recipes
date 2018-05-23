@@ -1,6 +1,7 @@
 <!-- TOC -->
 
 - [1. 说明](#1-说明)
+- [2. benchmark sudoku](#2-benchmark-sudoku)
 
 <!-- /TOC -->
 
@@ -25,3 +26,8 @@ go run sudoku_server.go :20000
 go run sudoku_client.go 127.0.0.1:20000 080001030500804706000270000920400003103958402400002089000029000305106008040300010
 
 ```
+
+<a id="markdown-2-benchmark-sudoku" name="2-benchmark-sudoku"></a>
+# 2. benchmark sudoku
+
+

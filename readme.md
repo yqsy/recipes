@@ -80,6 +80,8 @@
 ## 2.6. 测试框架
 
 * [grpc_sudoku](grpc/sudoku)
+* [thrift_sudoku](thrift/sudoku)
+* [rabbitmq](rabbitmq)
 
 <a id="markdown-27-特性" name="27-特性"></a>
 ## 2.7. 特性
