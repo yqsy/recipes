@@ -155,11 +155,7 @@ func (tw *TimeWheel) ticksTillDie() {
 	}
 }
 
-func panicOnError(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
+
 
 func serverConn(conn net.Conn, tw *TimeWheel) {
 	go func(conn net.Conn) {
@@ -212,7 +208,9 @@ func main() {
 
 	// server
 	listener, err := net.Listen("tcp", arg[1])
-	panicOnError(err)
+	if err != nil {
+		panic(err)
+	}
 
 	defer listener.Close()
 

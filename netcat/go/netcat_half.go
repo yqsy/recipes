@@ -7,11 +7,7 @@ import (
 	"io"
 )
 
-func panicOnError(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
+
 
 func relay(conn net.Conn) {
 	defer conn.Close()
@@ -57,16 +53,22 @@ func main() {
 		//server
 		addr := ":" + arg[2]
 		listener, err := net.Listen("tcp", addr)
-		panicOnError(err)
+		if err != nil {
+			panic(err)
+		}
 		conn, err := listener.Accept()
-		panicOnError(err)
+		if err != nil {
+			panic(err)
+		}
 		listener.Close()
 		relay(conn)
 	} else {
 		//client
 		addr := arg[1] + ":" + arg[2]
 		conn, err := net.Dial("tcp", addr)
-		panicOnError(err)
+		if err != nil {
+			panic(err)
+		}
 		relay(conn)
 	}
 }

@@ -9,11 +9,6 @@ import (
 	"io"
 )
 
-func panicOnError(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
 
 func relay(conn net.Conn) {
 	defer conn.Close()
@@ -61,12 +56,18 @@ func main() {
 		// server
 		addr := ":" + arg[2]
 		cer, err := tls.LoadX509KeyPair("fd.crt", "fd.key")
-		panicOnError(err)
+		if err != nil {
+			panic(err)
+		}
 		config := &tls.Config{Certificates: []tls.Certificate{cer}}
 		listener, err := tls.Listen("tcp", addr, config)
-		panicOnError(err)
+		if err != nil {
+			panic(err)
+		}
 		conn, err := listener.Accept()
-		panicOnError(err)
+		if err != nil {
+			panic(err)
+		}
 		listener.Close()
 		relay(conn)
 	} else {
@@ -74,7 +75,9 @@ func main() {
 		addr := arg[1] + ":" + arg[2]
 		config := &tls.Config{InsecureSkipVerify: true}
 		conn, err := tls.Dial("tcp", addr, config)
-		panicOnError(err)
+		if err != nil {
+			panic(err)
+		}
 		relay(conn)
 	}
 }

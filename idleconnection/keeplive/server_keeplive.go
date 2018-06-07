@@ -9,11 +9,6 @@ import (
 	"log"
 )
 
-func panicOnError(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
 
 func serverConn(conn net.Conn) {
 	defer conn.Close()
@@ -35,7 +30,9 @@ func main() {
 	}
 
 	listener, err := net.Listen("tcp", arg[1])
-	panicOnError(err)
+	if err != nil {
+		panic(err)
+	}
 
 	defer listener.Close()
 

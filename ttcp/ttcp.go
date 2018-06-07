@@ -10,11 +10,6 @@ import (
 	"io"
 )
 
-func panicOnError(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
 
 type SessionMessage struct {
 	Number, Length int32
@@ -52,17 +47,23 @@ func (sessionMessage *SessionMessage) checkLegalAndExit() {
 
 func receive(listenAddr string) {
 	listener, err := net.Listen("tcp", listenAddr)
-	panicOnError(err)
+	if err != nil {
+		panic(err)
+	}
 	fmt.Printf("Listening on %v\n", listenAddr)
 	defer listener.Close()
 	conn, err := listener.Accept()
-	panicOnError(err)
+	if err != nil {
+		panic(err)
+	}
 	defer conn.Close()
 
 	// read header
 	var sessionMessage SessionMessage
 	err = binary.Read(conn, binary.BigEndian, &sessionMessage)
-	panicOnError(err)
+	if err != nil {
+		panic(err)
+	}
 
 	sessionMessage.print()
 	sessionMessage.checkLegalAndExit()
@@ -74,14 +75,18 @@ func receive(listenAddr string) {
 		// read a payload
 		var length int32
 		err = binary.Read(conn, binary.BigEndian, &length)
-		panicOnError(err)
+		if err != nil {
+			panic(err)
+		}
 		if length != sessionMessage.Length {
 			fmt.Printf("binary.Read %v != %v\n", length, sessionMessage.Length)
 			os.Exit(-1)
 		}
 
 		n, err := io.ReadFull(conn, payload)
-		panicOnError(err)
+		if err != nil {
+			panic(err)
+		}
 		if n != len(payload) {
 			fmt.Printf("io.ReadFull %v != %v\n", n, len(payload))
 			os.Exit(-1)
@@ -89,7 +94,9 @@ func receive(listenAddr string) {
 
 		// write an ack
 		err = binary.Write(conn, binary.BigEndian, &length)
-		panicOnError(err)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -99,14 +106,18 @@ func transmit(remoteAddr string, number int, length int) {
 	sessionMessage.checkLegalAndExit()
 
 	conn, err := net.Dial("tcp", remoteAddr)
-	panicOnError(err)
+	if err != nil {
+		panic(err)
+	}
 	defer conn.Close()
 
 	start := time.Now()
 
 	// write header
 	err = binary.Write(conn, binary.BigEndian, &sessionMessage)
-	panicOnError(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// write payload
 	payload := make([]byte, 4+length)
@@ -118,7 +129,9 @@ func transmit(remoteAddr string, number int, length int) {
 	for i := 0; i < number; i++ {
 		// write a payload
 		n, err := conn.Write(payload)
-		panicOnError(err)
+		if err != nil {
+			panic(err)
+		}
 		if n != len(payload) {
 			fmt.Printf("write payload %v != %v\n", n, len(payload))
 			os.Exit(-1)
@@ -127,7 +140,9 @@ func transmit(remoteAddr string, number int, length int) {
 		// read an ack
 		var ack int32
 		err = binary.Read(conn, binary.BigEndian, &ack)
-		panicOnError(err)
+		if err != nil {
+			panic(err)
+		}
 		if ack != int32(length) {
 			fmt.Printf("ack %v != %v\n", ack, int32(length))
 			os.Exit(-1)

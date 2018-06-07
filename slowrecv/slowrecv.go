@@ -7,11 +7,7 @@ import (
 	"io"
 )
 
-func panicOnError(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
+
 
 func recv(conn net.Conn) {
 	defer conn.Close()
@@ -31,7 +27,9 @@ func main() {
 		//server
 		addr := ":" + arg[2]
 		listener, err := net.Listen("tcp", addr)
-		panicOnError(err)
+		if err != nil {
+			panic(err)
+		}
 		defer listener.Close()
 
 		for {
