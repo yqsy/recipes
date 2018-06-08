@@ -7,8 +7,6 @@ import (
 	"io"
 )
 
-
-
 func relay(conn net.Conn) {
 	defer conn.Close()
 
@@ -50,7 +48,7 @@ func main() {
 	}
 
 	if arg[1] == "-l" {
-		//server
+		// server
 		addr := ":" + arg[2]
 		listener, err := net.Listen("tcp", addr)
 		if err != nil {
@@ -63,7 +61,7 @@ func main() {
 		listener.Close()
 		relay(conn)
 	} else {
-		//client
+		// client
 		addr := arg[1] + ":" + arg[2]
 		conn, err := net.Dial("tcp", addr)
 		if err != nil {
