@@ -18,14 +18,14 @@ def closing(conn):
 
 
 def copy(dst, src):
-    while True:
-        try:
+    try:
+        while True:
             data = os.read(src, 16384)
             if not data:
                 raise Exception("EOF")
             os.write(dst, data)
-        except:
-            break
+    except:
+        pass
 
 
 def relay(conn):

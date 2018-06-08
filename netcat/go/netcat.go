@@ -7,7 +7,9 @@ import (
 	"io"
 )
 
-
+var (
+	HalfCloseEnable = false
+)
 
 func relay(conn net.Conn) {
 	defer conn.Close()
@@ -35,9 +37,10 @@ func relay(conn net.Conn) {
 		conn.(*net.TCPConn).CloseWrite()
 		<-done
 	} else {
-		//how to stop read from stdin?
-		//<-done
-		//conn.(*net.TCPConn).CloseWrite()
+		if HalfCloseEnable {
+			<-done
+			conn.(*net.TCPConn).CloseWrite()
+		}
 	}
 }
 
@@ -48,6 +51,10 @@ func main() {
 	if len(arg) < 3 {
 		fmt.Printf("Usage:\n  %v -l port\n  %v host port\n", arg[0], arg[0])
 		return
+	}
+
+	if len(arg) > 3 && arg[3] == "-h" {
+		HalfCloseEnable = true
 	}
 
 	if arg[1] == "-l" {
