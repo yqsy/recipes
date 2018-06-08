@@ -45,6 +45,7 @@
 * [daytime](daytime)
 * [ttcp](ttcp)
 * [simplehttp(s)](simplehttp)
+* [simpleudp](simpleudp)
 
 <a id="markdown-23-benchmark" name="23-benchmark"></a>
 ## 2.3. benchmark

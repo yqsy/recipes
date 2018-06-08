@@ -315,3 +315,4 @@ sudoku/sudokuloadtest/r0002
 sudoku/sudokuserver/command-line-options
 sudoku/bin/sudokuserver
 sudoku/bin/sudokuloadtest
+simpleudp/client/client
