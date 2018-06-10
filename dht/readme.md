@@ -1,6 +1,7 @@
 <!-- TOC -->
 
 - [1. 说明](#1-说明)
+- [2. 我梳理的概要](#2-我梳理的概要)
 
 <!-- /TOC -->
 
@@ -24,8 +25,52 @@ BEP协议
 不错的文档:
 * https://www.jianshu.com/p/5c8e1ef0e0c3 (文档1)
 * https://www.jianshu.com/p/8229e6be1e23 (文档2)
+* http://www.aneasystone.com/archives/2015/05/analyze-magnet-protocol-using-wireshark.html (抓包分析)
+* http://www.aneasystone.com/archives/2015/05/how-does-magnet-link-work.html
+* https://juejin.im/entry/576ecaa4d342d30057c88408
 
 成品:
 * http://www.baocaibt.org/
 * http://bthub.io/
+
+工具:
+* https://tool.lu/torrent
+* https://github.com/ngosang/trackerslist 
+
+bt缓存站:
+* http://storetorrents.com/hash/
+
+
+
+<a id="markdown-2-我梳理的概要" name="2-我梳理的概要"></a>
+# 2. 我梳理的概要
+
+先对协议进行梳理吧:
+
+* ping: 字面含义作用
+* find_node: 寻找`最近`的node
+* get_peers: 根据`info_hash`获取`peers`  
+* announce_peer: 通知其他节点自己开始下载某个资源,用于构建peer列表
+
+```
+传统 
+.torrent文件 -> 固定的tracker -> peers  (peers提供文件下载)
+
+分布式
+hash值(磁力链接) -> get_peers -> .torrent文件(trackerless)   (peers提供种子的下载)
+```
+
+```
+迅雷(猜测)
+hash值(磁力链接) -> 自己的网络寻找tracker -> .torrent文件
+```
+
+dht爬虫思路:
+* 不断地find_node,加入到其他node的路由表中.让其他节点发送`announce_peer`给自己,获得`info_hash`
+* 两种方式从info_hash到种子 1. 去种子库获取 2. bep_009
+
+---
+
+* get_peers info_hash在该网络中不一定存在
+* announce_peer info_hash在该网路中一定存在
 
