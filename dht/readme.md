@@ -19,7 +19,7 @@
 BEP协议
 * http://www.bittorrent.org/beps/bep_0003.html (BT协议)
 * http://www.bittorrent.org/beps/bep_0005.html (dhc)
-* http://www.bittorrent.org/beps/bep_0009.html (hashinfo -> 种子)
+* http://www.bittorrent.org/beps/bep_0009.html (hashinfo -> metadata)
 * http://www.bittorrent.org/beps/bep_0010.html 
 
 不错的文档:
@@ -52,25 +52,16 @@ bt缓存站:
 * get_peers: 根据`info_hash`获取`peers`  
 * announce_peer: 通知其他节点自己开始下载某个资源,用于构建peer列表
 
-```
-传统 
-.torrent文件 -> 固定的tracker -> peers  (peers提供文件下载)
-
-分布式
-hash值(磁力链接) -> get_peers -> .torrent文件(trackerless)   (peers提供种子的下载)
-```
-
-```
-迅雷(猜测)
-hash值(磁力链接) -> 自己的网络寻找tracker -> .torrent文件
-```
 
 dht爬虫思路:
 * 不断地find_node,加入到其他node的路由表中.让其他节点发送`announce_peer`给自己,获得`info_hash`
-* 两种方式从info_hash到种子 1. 去种子库获取 2. bep_009
+* 两种方式从info_hash到metadata ~~1. 去种子库获取~~ 2. bep_009
+
+下载思路:
+* 传统: .torrent文件 -> 固定的tracker -> peers  (peers提供文件下载)
+* 分布式: hash值(磁力链接) -> get_peers 
 
 ---
 
 * get_peers info_hash在该网络中不一定存在
 * announce_peer info_hash在该网路中一定存在
-
