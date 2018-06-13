@@ -77,7 +77,7 @@
 * [cgi留言板](cgi)
 * [fastcgi](fastcgi)
 * [dht](dht)
-
+* [websocket](websocket)
 
 <a id="markdown-26-测试框架" name="26-测试框架"></a>
 ## 2.6. 测试框架

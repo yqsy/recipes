@@ -2,7 +2,8 @@
 
 - [1. 说明](#1-说明)
 - [2. 我梳理的概要](#2-我梳理的概要)
-- [3. find_node](#3-find_node)
+- [3. 实现思路](#3-实现思路)
+- [4. find_node](#4-find_node)
 
 <!-- /TOC -->
 
@@ -67,8 +68,24 @@ dht爬虫思路:
 * get_peers info_hash在该网络中不一定存在
 * announce_peer info_hash在该网路中一定存在
 
-<a id="markdown-3-find_node" name="3-find_node"></a>
-# 3. find_node
+
+<a id="markdown-3-实现思路" name="3-实现思路"></a>
+# 3. 实现思路
+
+* 发送find_node加入dht网络
+* 接收find_node的应答 -> 继续发送find_node请求(来回往复)
+
+---
+* 接收get_peers请求,发送模拟空应答
+* 接收announce_peer请求,存储hash_info
+
+---
+全双工协议,请求应答的思路:  
+* 协议的"y"表示了是请求`"r"`还是应答`"q"`
+* 用事务ID保持`请求应答匹配`的正确,唯一性,以及知道应答的type好做`dispatch`
+
+<a id="markdown-4-find_node" name="4-find_node"></a>
+# 4. find_node
 
 python和go的example有些差异,两边各自都有些问题
 
@@ -76,7 +93,6 @@ python和go的example有些差异,两边各自都有些问题
 -|-|-|-
 go|id:自身 target:自身|id:衍生地址+自身混合 target:衍生地址|全局递增的id取2字节
 python|id:自身 target:随机|id:衍生地址+自身混合 target:随机|随机2字节
-
 
 
 go
