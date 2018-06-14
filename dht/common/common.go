@@ -14,7 +14,7 @@ type ProtoSimple struct {
 	Q string `bencode:"q"`
 }
 
-type A struct {
+type AFindNode struct {
 	// self id
 	Id string `bencode:"id"`
 
@@ -23,23 +23,13 @@ type A struct {
 }
 
 type ReqFindNode struct {
-	T string `bencode:"t"`
-	Y string `bencode:"y"`
-	Q string `bencode:"q"`
-	A A      `bencode:"a"`
+	T string    `bencode:"t"`
+	Y string    `bencode:"y"`
+	Q string    `bencode:"q"`
+	A AFindNode `bencode:"a"`
 }
 
-func NewReqFindNode(t, id, target string) *ReqFindNode {
-	req := &ReqFindNode{}
-	req.T = t
-	req.Y = "q"
-	req.Q = "find_node"
-	req.A.Id = id
-	req.A.Target = target
-	return req
-}
-
-type R struct {
+type RFindNode struct {
 	Id string `bencode:"id"`
 
 	// each has id + ip + port
@@ -48,16 +38,10 @@ type R struct {
 }
 
 type ResFindNode struct {
-	T string `bencode:"t"`
-	Y string `bencode:"y"`
-	R R      `bencode:"r"`
+	T string    `bencode:"t"`
+	Y string    `bencode:"y"`
+	R RFindNode `bencode:"r"`
 }
-
-type ReqGetPeers struct {
-
-}
-
-
 
 func (resFindNode *ResFindNode) CheckValid() error {
 	if len(resFindNode.R.Id) != 20 {
@@ -99,4 +83,64 @@ func (resFindNode *ResFindNode) GetNodes() []Node {
 	}
 
 	return nodes
+}
+
+type AGetPeers struct {
+	Id       string `bencode:"id"`
+	InfoHash string `bencode:"info_hash"`
+}
+
+type ReqGetPeers struct {
+	T string    `bencode:"t"`
+	Y string    `bencode:"y"`
+	Q string    `bencode:"q"`
+	A AGetPeers `bencode:"a"`
+}
+
+type RGetPeers struct {
+	Id    string `bencode:"id"`
+	Token string `bencode:"token"`
+	Nodes string `bencode:"nodes"`
+}
+
+type ResGetPeers struct {
+	T string    `bencode:"t"`
+	Y string    `bencode:"y"`
+	R RGetPeers `bencode:"r"`
+}
+
+type AAnnouncePeer struct {
+	Id          string `bencode:"id"`
+	ImpliedPort int    `bencode:"implied_port"`
+	InfoHash    string `bencode:"info_hash"`
+	Port        int    `bencode:"port"`
+	Token       string `bencode:"token"`
+}
+
+type ReqAnnouncePeer struct {
+	T string        `bencode:"t"`
+	Y string        `bencode:"y"`
+	Q string        `bencode:"q"`
+	A AAnnouncePeer `bencode:"a"`
+}
+
+type RAnnouncePeer struct {
+	Id string `bencode:"id"`
+}
+
+type ResAnnouncePeer struct {
+	T string        `bencode:"t"`
+	Y string        `bencode:"y"`
+	R RAnnouncePeer `bencode:"r"`
+}
+
+type APing struct {
+	Id string `bencode:"id"`
+}
+
+type ReqPing struct {
+	T string `bencode:"t"`
+	Y string `bencode:"y"`
+	Q string `bencode:"q"`
+	A APing  `bencode:"a"`
 }

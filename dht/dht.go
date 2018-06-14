@@ -16,9 +16,8 @@ func main() {
 	logrus.AddHook(helpful.ContextHook{})
 
 	d := dht.NewDht()
-
 	go func() {
-		if err := d.Serve(); err != nil {
+		if err := d.Run(); err != nil {
 			panic(err)
 		}
 	}()
