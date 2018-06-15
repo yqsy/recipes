@@ -36,6 +36,12 @@ type Inspector struct {
 	// 收到announce_peer请求数
 	ReceivedGetAnnouncePeerNumber int
 
+	// 本次启动到现在收集到的hashinfo
+	HashInfoNumberSinceStart int
+
+	// 总计hashinfo
+	HashInfoNumberAll int
+
 	mtx sync.Mutex
 }
 
@@ -50,6 +56,8 @@ type BasicInfo struct {
 	ReceivedFindNodeNumber        int      `json:"ReceivedFindNodeNumber"`
 	ReceivedGetPeersNumber        int      `json:"ReceivedGetPeersNumber"`
 	ReceivedGetAnnouncePeerNumber int      `json:"ReceivedGetAnnouncePeerNumber"`
+	HashInfoNumberSinceStart      int      `json:"HashInfoNumberSinceStart"`
+	HashInfoNumberAll             int      `json:"HashInfoNumberAll"`
 }
 
 type Node struct {
@@ -86,6 +94,8 @@ func (help *HelpInspect) BasicInfo() gin.HandlerFunc {
 			basicInfo.ReceivedFindNodeNumber = help.Ins.ReceivedFindNodeNumber
 			basicInfo.ReceivedGetPeersNumber = help.Ins.ReceivedGetPeersNumber
 			basicInfo.ReceivedGetAnnouncePeerNumber = help.Ins.ReceivedGetAnnouncePeerNumber
+			basicInfo.HashInfoNumberSinceStart = help.Ins.HashInfoNumberSinceStart
+			basicInfo.HashInfoNumberAll = help.Ins.HashInfoNumberAll
 		})
 
 		if err := c.BindJSON(basicInfo); err != nil {
@@ -114,3 +124,4 @@ func (help *HelpInspect) AllNodes() gin.HandlerFunc {
 		c.IndentedJSON(http.StatusOK, allNodes)
 	}
 }
+

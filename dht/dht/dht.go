@@ -45,7 +45,7 @@ type DHT struct {
 	uniqueNodePool map[string]struct{}
 
 	// output
-	hashInfoChan chan string
+	HashInfoChan chan string
 }
 
 func NewDht() *DHT {
@@ -59,7 +59,7 @@ func NewDht() *DHT {
 	dht.resPrototypeDict = make(map[string]interface{})
 	dht.reqPrototypeDict = make(map[string]interface{})
 	dht.uniqueNodePool = make(map[string]struct{})
-	dht.hashInfoChan = make(chan string, 1024)
+	dht.HashInfoChan = make(chan string, 1024)
 
 	dht.reqPrototypeDict["ping"] = reflect.TypeOf((*common.ReqPing)(nil))
 	dht.reqPrototypeDict["find_node"] = reflect.TypeOf((*common.ReqFindNode)(nil))
@@ -157,13 +157,12 @@ func (dht *DHT) DispatchReq(buf []byte, q string, remoteAddr *net.UDPAddr) {
 				dht.Ins.SafeDo(func() {
 					dht.Ins.ReceivedGetPeersNumber += 1
 				})
-
 				dht.HandleReqGetPeers(req.(*common.ReqGetPeers), remoteAddr)
-
 			case *common.ReqAnnouncePeer:
 				dht.Ins.SafeDo(func() {
 					dht.Ins.ReceivedGetAnnouncePeerNumber += 1
 				})
+				dht.HandleReqAnnouncePeer(req.(*common.ReqAnnouncePeer), remoteAddr)
 			default:
 				panic("no way")
 			}
@@ -189,7 +188,12 @@ func (dht *DHT) HandleReqGetPeers(reqGetPeers *common.ReqGetPeers, remoteAddr *n
 }
 
 func (dht *DHT) HandleReqAnnouncePeer(reqAnnouncePeer *common.ReqAnnouncePeer, remoteAddr *net.UDPAddr) {
-	dht.hashInfoChan <- reqAnnouncePeer.A.InfoHash
+	if len(reqAnnouncePeer.A.InfoHash) != 20 {
+		logrus.Warnf("infohash len != 20")
+		return
+	}
+
+	dht.HashInfoChan <- reqAnnouncePeer.A.InfoHash
 
 	// TODO what is self id?
 	resAnnouncePeer := &common.ResAnnouncePeer{T: reqAnnouncePeer.T, Y: "r",

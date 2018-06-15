@@ -22,6 +22,23 @@ func main() {
 		}
 	}()
 
+	go func() {
+		uniqDict := make(map[string]struct{})
+
+		// TODO d.Ins.HashInfoNumberAll read from db
+		for {
+			hashInfo := <-d.HashInfoChan
+			if _, ok := uniqDict[hashInfo]; !ok {
+				uniqDict[hashInfo] = struct{}{}
+
+				d.Ins.SafeDo(func() {
+					d.Ins.HashInfoNumberSinceStart += 1
+					d.Ins.HashInfoNumberAll += 1
+				})
+			}
+		}
+	}()
+
 	helpInspector := inspector.HelpInspect{Ins: &d.Ins}
 
 	r := gin.Default()
