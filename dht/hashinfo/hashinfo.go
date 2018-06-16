@@ -6,12 +6,14 @@ import (
 	"github.com/yqsy/recipes/dht/transaction"
 	"github.com/yqsy/recipes/dht/hashinfocommon"
 	"github.com/zeebo/bencode"
-	"github.com/Sirupsen/logrus"
 	"reflect"
 	"github.com/yqsy/recipes/dht/inspector"
 	"github.com/yqsy/recipes/dht/metadata"
 	"strconv"
+	"github.com/op/go-logging"
 )
+
+var log = logging.MustGetLogger("dht")
 
 const (
 	TokenLen = 2
@@ -126,14 +128,14 @@ func (hg *HashInfoGetter) RecvAndDispatch() error {
 		} else {
 			protoSimple := &hashinfocommon.ProtoSimple{}
 			if err = bencode.DecodeBytes(buf[:rn], protoSimple); err != nil {
-				logrus.Warnf("decode error from: %v", remoteAddr)
+				log.Warningf("decode error from: %v", remoteAddr)
 			} else {
 				if protoSimple.Y == "q" {
 					hg.DispatchReq(buf[:rn], protoSimple.Q, remoteAddr)
 				} else if protoSimple.Y == "r" {
 					hg.DispatchRes(buf[:rn], protoSimple.T)
 				} else {
-					logrus.Warnf(`error "y": %v from: %v`, protoSimple.Y, remoteAddr)
+					log.Warningf(`error "y": %v from: %v`, protoSimple.Y, remoteAddr)
 				}
 			}
 		}
@@ -148,7 +150,7 @@ func (hg *HashInfoGetter) DispatchReq(buf []byte, q string, remoteAddr *net.UDPA
 		req := reflect.New(prototype.(reflect.Type).Elem()).Interface()
 
 		if err := bencode.DecodeBytes(buf, req); err != nil {
-			logrus.Warnf("decode req err: %v", err)
+			log.Warningf("decode req err: %v", err)
 		} else {
 			switch req.(type) {
 			case *hashinfocommon.ReqPing:
@@ -174,7 +176,7 @@ func (hg *HashInfoGetter) DispatchReq(buf []byte, q string, remoteAddr *net.UDPA
 			}
 		}
 	} else {
-		logrus.Warnf("can't not find prototype %v", q)
+		log.Warningf("can't not find prototype %v", q)
 	}
 }
 
@@ -185,17 +187,17 @@ func (hg *HashInfoGetter) HandleReqGetPeers(reqGetPeers *hashinfocommon.ReqGetPe
 		R: hashinfocommon.RGetPeers{Id: hg.selfId, Token: reqGetPeers.A.InfoHash[:TokenLen], Nodes: ""}}
 
 	if resBytes, err := bencode.EncodeBytes(resGetPeers); err != nil {
-		logrus.Warnf("encode res err: %v", err)
+		log.Warningf("encode res err: %v", err)
 	} else {
 		if _, err = hg.serverConn.WriteToUDP(resBytes, remoteAddr); err != nil {
-			logrus.Warnf("write udp err: %v", err)
+			log.Warningf("write udp err: %v", err)
 		}
 	}
 }
 
 func (hg *HashInfoGetter) HandleReqAnnouncePeer(reqAnnouncePeer *hashinfocommon.ReqAnnouncePeer, remoteAddr *net.UDPAddr) {
 	if len(reqAnnouncePeer.A.InfoHash) != 20 {
-		logrus.Warnf("infohash len != 20")
+		log.Warningf("infohash len != 20")
 		return
 	}
 
@@ -209,10 +211,10 @@ func (hg *HashInfoGetter) HandleReqAnnouncePeer(reqAnnouncePeer *hashinfocommon.
 		R: hashinfocommon.RAnnouncePeer{Id: hg.selfId}}
 
 	if resBytes, err := bencode.EncodeBytes(resAnnouncePeer); err != nil {
-		logrus.Warnf("encode res err: %v", err)
+		log.Warningf("encode res err: %v", err)
 	} else {
 		if _, err = hg.serverConn.WriteToUDP(resBytes, remoteAddr); err != nil {
-			logrus.Warnf("write udp err: %v", err)
+			log.Warningf("write udp err: %v", err)
 		}
 	}
 }
@@ -227,7 +229,7 @@ func (hg *HashInfoGetter) DispatchRes(buf []byte, tid string) {
 
 		res := reflect.New(prototype.(reflect.Type).Elem()).Interface()
 		if err := bencode.DecodeBytes(buf, res); err != nil {
-			logrus.Warnf("can't not decode tid: %v err: %v", tid, err)
+			log.Warningf("can't not decode tid: %v err: %v", tid, err)
 		} else {
 			switch res.(type) {
 			case *hashinfocommon.ResFindNode:
@@ -237,19 +239,19 @@ func (hg *HashInfoGetter) DispatchRes(buf []byte, tid string) {
 			}
 		}
 	} else {
-		logrus.Warnf("not match res received tid: %v,drop it", tid)
+		log.Warningf("not match res received tid: %v,drop it", tid)
 	}
 }
 
 func (hg *HashInfoGetter) HandleResFindNode(resFindNode *hashinfocommon.ResFindNode) {
 	if err := resFindNode.CheckValid(); err != nil {
-		logrus.Warnf("not valid ResFindNode err: %v", err)
+		log.Warningf("not valid ResFindNode err: %v", err)
 	} else {
 		nodes := resFindNode.GetNodes()
-		logrus.Infof("get %v nodes", len(nodes))
+		//log.Infof("get %v nodes", len(nodes))
 		for _, node := range nodes {
 			if _, ok := hg.uniqueNodePool[node.Id]; ok {
-				logrus.Infof("node repeat id: %v", node.Id)
+				//log.Warningf("node repeat id: %v", helpful.GetHex(node.Id))
 				continue
 			}
 			hg.uniqueNodePool[node.Id] = struct{}{}
@@ -260,13 +262,13 @@ func (hg *HashInfoGetter) HandleResFindNode(resFindNode *hashinfocommon.ResFindN
 				A: hashinfocommon.AFindNode{Id: hg.selfId, Target: helpful.RandomString(20)}}
 
 			if reqBytes, err := bencode.EncodeBytes(reqFindNode); err != nil {
-				logrus.Warnf("encode err: %v", err)
+				log.Warningf("encode err: %v", err)
 			} else {
 				if nodeAddr, err := net.ResolveUDPAddr("udp", node.Addr); err != nil {
-					logrus.Warnf("resolve udp addr err: %v", err)
+					log.Warningf("resolve udp addr err: %v", err)
 				} else {
 					if err = hg.sendReq(reqBytes, nodeAddr, tid, (*hashinfocommon.ResFindNode)(nil)); err != nil {
-						logrus.Warnf("write udp err: %v", err)
+						log.Warningf("write udp err: %v", err)
 					}
 					hg.Ins.SafeDo(func() {
 						hg.Ins.SendedFindNodeNumber += 1

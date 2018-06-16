@@ -3,14 +3,16 @@ package metadata
 import (
 	"github.com/yqsy/recipes/dht/inspector"
 	"net"
-	"github.com/Sirupsen/logrus"
 	"io"
 	"bytes"
 	"github.com/yqsy/recipes/dht/helpful"
 	"errors"
 	"github.com/yqsy/recipes/dht/metadatacommon"
 	"github.com/zeebo/bencode"
+	"github.com/op/go-logging"
 )
+
+var log = logging.MustGetLogger("dht")
 
 const (
 	BLOCK = 16384
@@ -116,19 +118,19 @@ func (mg *MetaGetter) Serve(conn net.Conn, metaSource *MetaSource) {
 
 	for {
 		if err := mg.HandleShake(conn, metaSource); err != nil {
-			logrus.Warnf("handshake err: %v", err)
+			log.Warningf("handshake err: %v", err)
 			break
 		}
 
 		extHandshakeRes, err := mg.ExtHandleShake(conn, metaSource)
 		if err != nil {
-			logrus.Warnf("extHandleShake err: %v", err)
+			log.Warningf("extHandleShake err: %v", err)
 			break
 		}
 
 		err = mg.GetPieces(conn, extHandshakeRes)
 		if err != nil {
-			logrus.Warnf("GetPieces err: %v", err)
+			log.Warningf("GetPieces err: %v", err)
 			break
 		}
 	}
@@ -139,7 +141,7 @@ func (mg *MetaGetter) Run(metaSourceChan chan *MetaSource) error {
 	for {
 		metaSource := <-metaSourceChan
 		if conn, err := net.Dial("tcp", metaSource.Addr); err != nil {
-			logrus.Warnf("connect %v err: %v", metaSource.Addr, err)
+			log.Warningf("connect %v err: %v", metaSource.Addr, err)
 		} else {
 			go mg.Serve(conn, metaSource)
 		}

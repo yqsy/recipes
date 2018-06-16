@@ -2,9 +2,6 @@ package helpful
 
 import (
 	"crypto/rand"
-	"github.com/Sirupsen/logrus"
-	"runtime"
-	"path"
 	"fmt"
 	"bytes"
 	"encoding/binary"
@@ -16,25 +13,22 @@ func RandomString(len int) string {
 	return string(buf)
 }
 
-type ContextHook struct{}
 
-func (hook ContextHook) Levels() []logrus.Level {
-	return logrus.AllLevels
-}
-
-func (hook ContextHook) Fire(entry *logrus.Entry) error {
-	if _, file, line, ok := runtime.Caller(8); ok {
-		entry.Data["file"] = path.Base(file)
-		entry.Data["line"] = line
-	}
-
-	return nil
-}
+// 他的协议的表达形式看似是json字符串.
+// 其实不是,是数字!!方便人辨识要把内存中的数字转换成人眼可读的数字
 
 func GetHex(str string) (rtn string) {
 	buf := []byte(str)
 	for i := 0; i < len(buf); i++ {
 		rtn += fmt.Sprintf("%02x", buf[i])
+	}
+	return rtn
+}
+
+func Get10Hex(str string) (rtn string) {
+	buf := []byte(str)
+	for i := 0; i < len(buf); i++ {
+		rtn += fmt.Sprintf("%v", int(buf[i]))
 	}
 	return rtn
 }
