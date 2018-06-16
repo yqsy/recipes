@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"path"
 	"fmt"
+	"bytes"
+	"encoding/binary"
 )
 
 func RandomString(len int) string {
@@ -35,4 +37,15 @@ func GetHex(str string) (rtn string) {
 		rtn += fmt.Sprintf("%02x", buf[i])
 	}
 	return rtn
+}
+
+func ReadInt32(data []byte) (int32, error) {
+	var ret int32
+	buf := bytes.NewBuffer(data)
+	err := binary.Read(buf, binary.BigEndian, &ret)
+	if err != nil {
+		return 0, err
+	} else {
+		return ret, nil
+	}
 }

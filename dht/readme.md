@@ -22,7 +22,11 @@ BEP协议
 * http://www.bittorrent.org/beps/bep_0003.html (BT协议)
 * http://www.bittorrent.org/beps/bep_0005.html (dhc)
 * http://www.bittorrent.org/beps/bep_0009.html (hashinfo -> metadata)
-* http://www.bittorrent.org/beps/bep_0010.html 
+* http://www.bittorrent.org/beps/bep_0010.html (hashinfo -> metadata)
+
+rfc文档
+* http://jonas.nitro.dk/bittorrent/bittorrent-rfc.html (还是这个靠谱)
+
 
 不错的文档:
 * https://www.jianshu.com/p/5c8e1ef0e0c3 (文档1)

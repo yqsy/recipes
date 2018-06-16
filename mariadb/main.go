@@ -22,7 +22,7 @@ func main() {
 		return
 	}
 
-	db, err := sql.Open("mysql", fmt.Sprintf("root:%v@/dht?charset=utf8", arg[1]))
+	db, err := sql.Open("mysql", fmt.Sprintf("root:%v@/hashinfo?charset=utf8", arg[1]))
 
 	if err != nil {
 		panic(err)

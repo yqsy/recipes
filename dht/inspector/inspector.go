@@ -1,7 +1,7 @@
 package inspector
 
 import (
-	"github.com/yqsy/recipes/dht/common"
+	"github.com/yqsy/recipes/dht/hashinfocommon"
 	"sync"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -9,7 +9,7 @@ import (
 )
 
 type Inspector struct {
-	Nodes []*common.Node
+	Nodes []*hashinfocommon.Node
 
 	// 基础nodes
 	BasicNodes []string
