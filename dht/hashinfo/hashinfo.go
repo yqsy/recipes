@@ -135,7 +135,7 @@ func (hg *HashInfoGetter) RecvAndDispatch() error {
 				} else if protoSimple.Y == "r" {
 					hg.DispatchRes(buf[:rn], protoSimple.T)
 				} else {
-					log.Warningf(`error "y": %v from: %v`, protoSimple.Y, remoteAddr)
+					log.Warningf("error \"y\": %v from: %v", protoSimple.Y, remoteAddr)
 				}
 			}
 		}
@@ -229,7 +229,7 @@ func (hg *HashInfoGetter) DispatchRes(buf []byte, tid string) {
 
 		res := reflect.New(prototype.(reflect.Type).Elem()).Interface()
 		if err := bencode.DecodeBytes(buf, res); err != nil {
-			log.Warningf("can't not decode tid: %v err: %v", tid, err)
+			log.Warningf("can't not decode tid: %v err: %v", helpful.Get10Hex(tid), err)
 		} else {
 			switch res.(type) {
 			case *hashinfocommon.ResFindNode:
@@ -239,7 +239,7 @@ func (hg *HashInfoGetter) DispatchRes(buf []byte, tid string) {
 			}
 		}
 	} else {
-		log.Warningf("not match res received tid: %v,drop it", tid)
+		log.Warningf("not match res received tid: %v,drop it", helpful.Get10Hex(tid))
 	}
 }
 
@@ -255,6 +255,10 @@ func (hg *HashInfoGetter) HandleResFindNode(resFindNode *hashinfocommon.ResFindN
 				continue
 			}
 			hg.uniqueNodePool[node.Id] = struct{}{}
+
+			hg.Ins.SafeDo(func() {
+				hg.Ins.Nodes = append(hg.Ins.Nodes, &node)
+			})
 
 			tid := hg.tm.FetchAndAdd()
 			// selfId := node.Id[:10] + hashinfo.selfId[10:] TODO what is self id?

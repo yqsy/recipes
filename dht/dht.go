@@ -7,6 +7,7 @@ import (
 	"github.com/yqsy/recipes/dht/inspector"
 	"github.com/op/go-logging"
 	"os"
+	"io/ioutil"
 )
 
 const (
@@ -41,6 +42,9 @@ func main() {
 	//}()
 
 	helpInspector := inspector.HelpInspect{Ins: &ins}
+	gin.SetMode(gin.ReleaseMode)
+	gin.DefaultWriter = ioutil.Discard
+
 	r := gin.Default()
 	r.GET("/BasicInfo", helpInspector.BasicInfo())
 	r.GET("/AllNodes", helpInspector.AllNodes())

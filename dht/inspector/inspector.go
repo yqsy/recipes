@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"fmt"
+	"github.com/yqsy/recipes/dht/helpful"
 )
 
 type Inspector struct {
@@ -85,7 +86,7 @@ func (help *HelpInspect) BasicInfo() gin.HandlerFunc {
 
 		help.Ins.SafeDo(func() {
 			basicInfo.BasicNodes = help.Ins.BasicNodes
-			basicInfo.SelfId = help.Ins.SelfId
+			basicInfo.SelfId = helpful.GetHex(help.Ins.SelfId)
 			basicInfo.LocalAddr = help.Ins.LocalAddr
 			basicInfo.NodeNumber = len(help.Ins.Nodes)
 			basicInfo.SendedFindNodeNumber = help.Ins.SendedFindNodeNumber
@@ -98,7 +99,7 @@ func (help *HelpInspect) BasicInfo() gin.HandlerFunc {
 			basicInfo.HashInfoNumberAll = help.Ins.HashInfoNumberAll
 		})
 
-		if err := c.BindJSON(basicInfo); err != nil {
+		if err := c.Bind(basicInfo); err != nil {
 			panic(fmt.Sprintf("err: %v", err))
 		}
 
@@ -113,12 +114,12 @@ func (help *HelpInspect) AllNodes() gin.HandlerFunc {
 			for _, node := range help.Ins.Nodes {
 				tmpNode := Node{}
 				tmpNode.Id = node.Id
-				tmpNode.Addr = node.Addr
+				tmpNode.Addr = helpful.GetHex(node.Addr)
 				allNodes.Nodes = append(allNodes.Nodes, tmpNode)
 			}
 		})
 
-		if err := c.BindJSON(allNodes); err != nil {
+		if err := c.Bind(allNodes); err != nil {
 			panic(fmt.Sprintf("err: %v", err))
 		}
 		c.IndentedJSON(http.StatusOK, allNodes)
