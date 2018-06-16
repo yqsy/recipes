@@ -54,7 +54,7 @@ func NewHashInfoGetter(ins *inspector.Inspector) *HashInfoGetter {
 	hg := &HashInfoGetter{}
 	hg.dhtNodes = []string{
 		"router.bittorrent.com:6881",
-		"hashinfo.transmissionbt.com:6881",
+		"dht.transmissionbt.com:6881",
 		"router.utorrent.com:6881"}
 	hg.selfId = helpful.RandomString(20)
 	hg.localAddr = ":6882"
@@ -109,6 +109,9 @@ func (hg *HashInfoGetter) SendJoin() error {
 				if err = hg.sendReq(reqBytes, nodeAddr, tid, (*hashinfocommon.ResFindNode)(nil)); err != nil {
 					return err
 				}
+				hg.Ins.SafeDo(func() {
+					hg.Ins.SendedFindNodeNumber += 1
+				})
 			}
 		}
 	}
@@ -265,6 +268,9 @@ func (hg *HashInfoGetter) HandleResFindNode(resFindNode *hashinfocommon.ResFindN
 					if err = hg.sendReq(reqBytes, nodeAddr, tid, (*hashinfocommon.ResFindNode)(nil)); err != nil {
 						logrus.Warnf("write udp err: %v", err)
 					}
+					hg.Ins.SafeDo(func() {
+						hg.Ins.SendedFindNodeNumber += 1
+					})
 				}
 			}
 		}
@@ -278,7 +284,6 @@ func (hg *HashInfoGetter) sendReq(reqBytes []byte, remoteAddr *net.UDPAddr, tid 
 		hg.resPrototypeDict[tid] = reflect.TypeOf(resType)
 		hg.Ins.SafeDo(func() {
 			hg.Ins.UnReplyTid[tid] = struct{}{}
-			hg.Ins.SendedFindNodeNumber += 1
 		})
 		return nil
 	}

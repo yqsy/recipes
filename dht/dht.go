@@ -11,13 +11,13 @@ import (
 )
 
 const (
-	InspectorPort = 20001
+	InspectorAddr = ":20001"
 )
 
 func main() {
 	logrus.AddHook(helpful.ContextHook{})
 
-	var ins inspector.Inspector
+	ins := inspector.Inspector{UnReplyTid: make(map[string]struct{})}
 
 	hashInfoGetter := hashinfo.NewHashInfoGetter(&ins)
 	go func() {
@@ -37,4 +37,5 @@ func main() {
 	r := gin.Default()
 	r.GET("/BasicInfo", helpInspector.BasicInfo())
 	r.GET("/AllNodes", helpInspector.AllNodes())
+	r.Run(InspectorAddr)
 }

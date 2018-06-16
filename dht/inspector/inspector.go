@@ -124,4 +124,3 @@ func (help *HelpInspect) AllNodes() gin.HandlerFunc {
 		c.IndentedJSON(http.StatusOK, allNodes)
 	}
 }
-
