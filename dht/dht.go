@@ -8,6 +8,7 @@ import (
 	"github.com/op/go-logging"
 	"os"
 	"io/ioutil"
+	"github.com/yqsy/recipes/dht/metadata"
 )
 
 const (
@@ -34,12 +35,12 @@ func main() {
 		}
 	}()
 
-	//metaGetter := metadata.MetaGetter{Ins: &ins}
-	//go func() {
-	//	if err := metaGetter.Run(hashInfoGetter.MetaSourceChan); err != nil {
-	//		panic(err)
-	//	}
-	//}()
+	metaGetter := metadata.MetaGetter{Ins: &ins}
+	go func() {
+		if err := metaGetter.Run(hashInfoGetter.MetaSourceChan); err != nil {
+			panic(err)
+		}
+	}()
 
 	helpInspector := inspector.HelpInspect{Ins: &ins}
 	gin.SetMode(gin.ReleaseMode)

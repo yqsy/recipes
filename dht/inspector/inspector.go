@@ -22,6 +22,7 @@ type Inspector struct {
 	// 自身请求应答,没收到相应应答的事务号
 	UnReplyTid map[string]struct{}
 
+	// 收到type为e的error消息
 	ReceivedErrors int
 
 	// 收到ping请求数
@@ -36,10 +37,10 @@ type Inspector struct {
 	// 收到announce_peer请求数
 	ReceivedGetAnnouncePeerNumber int
 
-	// 本次启动到现在收集到的hashinfo
+	// 本次启动到现在收集到的hashinfo  TODO
 	HashInfoNumberSinceStart int
 
-	// 总计hashinfo
+	// 总计hashinfo TODO
 	HashInfoNumberAll int
 
 	mtx sync.Mutex

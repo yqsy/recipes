@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"github.com/op/go-logging"
 	"github.com/yqsy/recipes/dht/flowcontrol"
+	"time"
 )
 
 var log = logging.MustGetLogger("dht")
@@ -55,6 +56,11 @@ type HashInfoGetter struct {
 	FlowControl *flowcontrol.FlowControl
 }
 
+type UdpMsg struct {
+	Packet     []byte
+	RemoteAddr *net.UDPAddr
+}
+
 func NewHashInfoGetter(ins *inspector.Inspector) *HashInfoGetter {
 	hg := &HashInfoGetter{}
 	hg.dhtNodes = []string{
@@ -91,20 +97,72 @@ func (hg *HashInfoGetter) Run() error {
 		if hg.serverConn, err = net.ListenUDP("udp", serverAddr); err != nil {
 			return err
 		} else {
-			if err = hg.SendJoin(); err != nil {
-				return err
+			if err := hg.SendJoin(); err != nil {
+				panic(err)
 			}
 		}
 	}
 
 	go func() {
-		hg.FlowControl.Increasing(256)
+		hg.FlowControl.Increasing(512)
 	}()
 
-	return hg.RecvAndDispatch()
+	recvUdpMsgChan := make(chan *UdpMsg)
+	consumeOkChan := make(chan struct{})
+
+	go func() {
+		hg.ProducingUdpMsg(consumeOkChan, recvUdpMsgChan)
+	}()
+
+	joinTicker := time.NewTicker(time.Second * 5)
+
+	consumeOkChan <- struct{}{} // start
+	for {
+		select {
+		case recvUdpMsg := <-recvUdpMsgChan:
+			hg.DispatchReqAndRes(recvUdpMsg.Packet, recvUdpMsg.RemoteAddr)
+			consumeOkChan <- struct{}{}
+		case <-joinTicker.C:
+			if err := hg.SendJoin(); err != nil {
+				log.Warningf("send join err: %v", err)
+			}
+		}
+	}
 }
 
-func (hg *HashInfoGetter) sendReq(reqBytes []byte, remoteAddr *net.UDPAddr, tid string, resType interface{}) error {
+func (hg *HashInfoGetter) ProducingUdpMsg(consumOkChan chan struct{}, recvUdpMsgChan chan *UdpMsg) {
+	buf := make([]byte, 2048)
+	for {
+		<-consumOkChan
+
+		if rn, remoteAddr, err := hg.serverConn.ReadFromUDP(buf); err != nil {
+			panic(err)
+		} else {
+			udpMsg := &UdpMsg{Packet: buf[:rn], RemoteAddr: remoteAddr}
+
+			recvUdpMsgChan <- udpMsg
+		}
+	}
+}
+
+func (hg *HashInfoGetter) DispatchReqAndRes(buf []byte, remoteAddr *net.UDPAddr) {
+	protoSimple := &hashinfocommon.ProtoSimple{}
+	if err := bencode.DecodeBytes(buf, protoSimple); err != nil {
+		log.Warningf("decode error from: %v", remoteAddr)
+	} else {
+		if protoSimple.Y == "q" {
+			hg.DispatchReq(buf, protoSimple.Q, remoteAddr)
+		} else if protoSimple.Y == "r" {
+			hg.DispatchRes(buf, protoSimple.T)
+		} else if protoSimple.Y == "e" {
+			hg.DispatchError(buf, protoSimple.T)
+		} else {
+			log.Warningf("error \"y\": %v from: %v", protoSimple.Y, remoteAddr)
+		}
+	}
+}
+
+func (hg *HashInfoGetter) SendReq(reqBytes []byte, remoteAddr *net.UDPAddr, tid string, resType interface{}) error {
 	if _, err := hg.serverConn.WriteToUDP(reqBytes, remoteAddr); err != nil {
 		return err
 	} else {
@@ -136,7 +194,7 @@ func (hg *HashInfoGetter) SendFindNode(nodeAddr string, selfId, targetId string)
 		if nodeAddr, err := net.ResolveUDPAddr("udp", nodeAddr); err != nil {
 			return err
 		} else {
-			if err = hg.sendReq(reqBytes, nodeAddr, tid, (*hashinfocommon.ResFindNode)(nil)); err != nil {
+			if err = hg.SendReq(reqBytes, nodeAddr, tid, (*hashinfocommon.ResFindNode)(nil)); err != nil {
 				return err
 			}
 			hg.Ins.SafeDo(func() {
@@ -145,30 +203,6 @@ func (hg *HashInfoGetter) SendFindNode(nodeAddr string, selfId, targetId string)
 		}
 	}
 	return nil
-}
-
-func (hg *HashInfoGetter) RecvAndDispatch() error {
-	buf := make([]byte, 2048)
-	for {
-		if rn, remoteAddr, err := hg.serverConn.ReadFromUDP(buf); err != nil {
-			return err
-		} else {
-			protoSimple := &hashinfocommon.ProtoSimple{}
-			if err = bencode.DecodeBytes(buf[:rn], protoSimple); err != nil {
-				log.Warningf("decode error from: %v", remoteAddr)
-			} else {
-				if protoSimple.Y == "q" {
-					hg.DispatchReq(buf[:rn], protoSimple.Q, remoteAddr)
-				} else if protoSimple.Y == "r" {
-					hg.DispatchRes(buf[:rn], protoSimple.T)
-				} else if protoSimple.Y == "e" {
-					hg.DispatchError(buf[:rn], protoSimple.T)
-				} else {
-					log.Warningf("error \"y\": %v from: %v", protoSimple.Y, remoteAddr)
-				}
-			}
-		}
-	}
 }
 
 func (hg *HashInfoGetter) DispatchReq(buf []byte, q string, remoteAddr *net.UDPAddr) {
@@ -319,7 +353,7 @@ func (hg *HashInfoGetter) HandleResFindNode(resFindNode *hashinfocommon.ResFindN
 
 			hg.FlowControl.WaitFlow()
 
-			if err := hg.SendFindNode(node.Addr, hg.selfId, node.Id[:15]+hg.selfId[15:]); err != nil {
+			if err := hg.SendFindNode(node.Addr, hg.selfId, hg.selfId[:15]+node.Id[15:]); err != nil {
 				log.Warningf("send find_node err: %v", err)
 			}
 		}
