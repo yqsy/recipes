@@ -92,27 +92,11 @@ dht爬虫思路:
 <a id="markdown-4-find_node" name="4-find_node"></a>
 # 4. find_node
 
-python和go的example有些差异,两边各自都有些问题
-
 语言|join|衍生|事务id
 -|-|-|-
-go|id:自身 target:自身|id:衍生地址+自身混合 target:衍生地址|全局递增的id取2字节
+go|id:自身 target:自身|id:自身 target:自身+衍生地址混合|全局递增的id取2字节
 python|id:自身 target:随机|id:衍生地址+自身混合 target:随机|随机2字节
 
-
-go
-
-逻辑不正确之一:
-id自身 target自身?下一节点遇到这样的奇葩查询还会返回附近的8个节点吗?
-
-逻辑不正确之二:
-target衍生地址? 你的目的是爬虫,下一个节点接收到你查询自身的请求时难道还会返回8个节点吗?
-
-
-python
-
-逻辑不正确之一:  
-随机2字节的事务id导致,一请求一应答的逻辑打破.一请求多应答?同样可以处理了,不严谨!
 
 
 

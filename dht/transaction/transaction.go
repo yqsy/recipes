@@ -14,6 +14,8 @@ type Transaction struct {
 // 0 ~ 65535
 func (tm *Transaction) FetchAndAdd() string {
 	id := atomic.AddUint64(&tm.Id, 1) - 1
+
+	//return string(id % 256)
 	var buf [2]byte
 	binary.BigEndian.PutUint16(buf[:], uint16(id%65536))
 	return string(buf[:])

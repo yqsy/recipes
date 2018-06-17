@@ -66,8 +66,8 @@ type WaterMask struct {
 // 增加水位,增加可读字节数目
 func (waterMask *WaterMask) AddMask(n uint64) {
 	waterMask.mtx.Lock()
-	defer waterMask.mtx.Unlock()
 	waterMask.bytes += n
+	waterMask.mtx.Unlock()
 	waterMask.cond.Signal()
 }
 

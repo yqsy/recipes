@@ -144,3 +144,13 @@ type ReqPing struct {
 	Q string `bencode:"q"`
 	A APing  `bencode:"a"`
 }
+
+type RPing struct {
+	Id string `bencode:"id"`
+}
+
+type ResPing struct {
+	T string `bencode:"t"`
+	Y string `bencode:"y"`
+	R RPing  `bencode:"r"`
+}

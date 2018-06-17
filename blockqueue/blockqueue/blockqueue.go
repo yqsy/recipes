@@ -18,8 +18,8 @@ func NewBlockQueue() *BlockQueue {
 
 func (bq *BlockQueue) Put(ele interface{}) {
 	bq.mtx.Lock()
-	defer bq.mtx.Unlock()
 	bq.queue = append(bq.queue, ele)
+	bq.mtx.Unlock()
 	bq.cond.Signal()
 }
 

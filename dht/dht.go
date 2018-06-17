@@ -47,6 +47,5 @@ func main() {
 
 	r := gin.Default()
 	r.GET("/BasicInfo", helpInspector.BasicInfo())
-	r.GET("/AllNodes", helpInspector.AllNodes())
 	r.Run(InspectorAddr)
 }

@@ -1,7 +1,6 @@
 package inspector
 
 import (
-	"github.com/yqsy/recipes/dht/hashinfocommon"
 	"sync"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -10,8 +9,6 @@ import (
 )
 
 type Inspector struct {
-	Nodes []*hashinfocommon.Node
-
 	// 基础nodes
 	BasicNodes []string
 
@@ -24,6 +21,8 @@ type Inspector struct {
 
 	// 自身请求应答,没收到相应应答的事务号
 	UnReplyTid map[string]struct{}
+
+	ReceivedErrors int
 
 	// 收到ping请求数
 	ReceivedPingNumber int
@@ -50,9 +49,9 @@ type BasicInfo struct {
 	BasicNodes                    []string `json:"BasicNodes"`
 	SelfId                        string   `json:"SelfId"`
 	LocalAddr                     string   `json:"LocalAddr"`
-	NodeNumber                    int      `json:"NodeNumber"`
 	SendedFindNodeNumber          int      `json:"SendedFindNodeNumber"`
 	UnreplyedNumber               int      `json:"UnreplyedNumber"`
+	ReceivedErrors                int      `json:"ReceivedErrors"`
 	ReceivedPingNumber            int      `json:"ReceivedPingNumber"`
 	ReceivedFindNodeNumber        int      `json:"ReceivedFindNodeNumber"`
 	ReceivedGetPeersNumber        int      `json:"ReceivedGetPeersNumber"`
@@ -88,9 +87,9 @@ func (help *HelpInspect) BasicInfo() gin.HandlerFunc {
 			basicInfo.BasicNodes = help.Ins.BasicNodes
 			basicInfo.SelfId = helpful.GetHex(help.Ins.SelfId)
 			basicInfo.LocalAddr = help.Ins.LocalAddr
-			basicInfo.NodeNumber = len(help.Ins.Nodes)
 			basicInfo.SendedFindNodeNumber = help.Ins.SendedFindNodeNumber
 			basicInfo.UnreplyedNumber = len(help.Ins.UnReplyTid)
+			basicInfo.ReceivedErrors = help.Ins.ReceivedErrors
 			basicInfo.ReceivedPingNumber = help.Ins.ReceivedPingNumber
 			basicInfo.ReceivedFindNodeNumber = help.Ins.ReceivedFindNodeNumber
 			basicInfo.ReceivedGetPeersNumber = help.Ins.ReceivedGetPeersNumber
@@ -104,24 +103,5 @@ func (help *HelpInspect) BasicInfo() gin.HandlerFunc {
 		}
 
 		c.IndentedJSON(http.StatusOK, basicInfo)
-	}
-}
-
-func (help *HelpInspect) AllNodes() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		allNodes := &AllNodes{}
-		help.Ins.SafeDo(func() {
-			for _, node := range help.Ins.Nodes {
-				tmpNode := Node{}
-				tmpNode.Id = node.Id
-				tmpNode.Addr = helpful.GetHex(node.Addr)
-				allNodes.Nodes = append(allNodes.Nodes, tmpNode)
-			}
-		})
-
-		if err := c.Bind(allNodes); err != nil {
-			panic(fmt.Sprintf("err: %v", err))
-		}
-		c.IndentedJSON(http.StatusOK, allNodes)
 	}
 }

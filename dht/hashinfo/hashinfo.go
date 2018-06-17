@@ -11,6 +11,7 @@ import (
 	"github.com/yqsy/recipes/dht/metadata"
 	"strconv"
 	"github.com/op/go-logging"
+	"github.com/yqsy/recipes/dht/flowcontrol"
 )
 
 var log = logging.MustGetLogger("dht")
@@ -50,21 +51,24 @@ type HashInfoGetter struct {
 
 	// for monitor
 	Ins *inspector.Inspector
+
+	FlowControl *flowcontrol.FlowControl
 }
 
 func NewHashInfoGetter(ins *inspector.Inspector) *HashInfoGetter {
 	hg := &HashInfoGetter{}
 	hg.dhtNodes = []string{
 		"router.bittorrent.com:6881",
-		"dht.transmissionbt.com:6881",
-		"router.utorrent.com:6881"}
+		"router.utorrent.com:6881",
+		"dht.transmissionbt.com:6881"}
 	hg.selfId = helpful.RandomString(20)
-	hg.localAddr = ":6882"
+	hg.localAddr = ":6881"
 	hg.resPrototypeDict = make(map[string]interface{})
 	hg.reqPrototypeDict = make(map[string]interface{})
 	hg.uniqueNodePool = make(map[string]struct{})
 	hg.MetaSourceChan = make(chan *metadata.MetaSource, 1024)
 	hg.Ins = ins
+	hg.FlowControl = flowcontrol.NewFlowControl()
 
 	hg.reqPrototypeDict["ping"] = reflect.TypeOf((*hashinfocommon.ReqPing)(nil))
 	hg.reqPrototypeDict["find_node"] = reflect.TypeOf((*hashinfocommon.ReqFindNode)(nil))
@@ -93,28 +97,51 @@ func (hg *HashInfoGetter) Run() error {
 		}
 	}
 
+	go func() {
+		hg.FlowControl.Increasing(256)
+	}()
+
 	return hg.RecvAndDispatch()
 }
 
-func (hg *HashInfoGetter) SendJoin() error {
-	for _, node := range hg.dhtNodes {
-		tid := hg.tm.FetchAndAdd()
-		reqFindNode := &hashinfocommon.ReqFindNode{T: tid, Y: "q", Q: "find_node",
-			A: hashinfocommon.AFindNode{Id: hg.selfId, Target: helpful.RandomString(20)}}
+func (hg *HashInfoGetter) sendReq(reqBytes []byte, remoteAddr *net.UDPAddr, tid string, resType interface{}) error {
+	if _, err := hg.serverConn.WriteToUDP(reqBytes, remoteAddr); err != nil {
+		return err
+	} else {
+		hg.resPrototypeDict[tid] = reflect.TypeOf(resType)
+		hg.Ins.SafeDo(func() {
+			hg.Ins.UnReplyTid[tid] = struct{}{}
+		})
+		return nil
+	}
+}
 
-		if reqBytes, err := bencode.EncodeBytes(reqFindNode); err != nil {
+func (hg *HashInfoGetter) SendJoin() error {
+	for _, nodeAddr := range hg.dhtNodes {
+		if err := hg.SendFindNode(nodeAddr, hg.selfId, hg.selfId); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (hg *HashInfoGetter) SendFindNode(nodeAddr string, selfId, targetId string) error {
+	tid := hg.tm.FetchAndAdd()
+	reqFindNode := &hashinfocommon.ReqFindNode{T: tid, Y: "q", Q: "find_node",
+		A: hashinfocommon.AFindNode{Id: selfId, Target: targetId}}
+
+	if reqBytes, err := bencode.EncodeBytes(reqFindNode); err != nil {
+		return err
+	} else {
+		if nodeAddr, err := net.ResolveUDPAddr("udp", nodeAddr); err != nil {
 			return err
 		} else {
-			if nodeAddr, err := net.ResolveUDPAddr("udp", node); err != nil {
+			if err = hg.sendReq(reqBytes, nodeAddr, tid, (*hashinfocommon.ResFindNode)(nil)); err != nil {
 				return err
-			} else {
-				if err = hg.sendReq(reqBytes, nodeAddr, tid, (*hashinfocommon.ResFindNode)(nil)); err != nil {
-					return err
-				}
-				hg.Ins.SafeDo(func() {
-					hg.Ins.SendedFindNodeNumber += 1
-				})
 			}
+			hg.Ins.SafeDo(func() {
+				hg.Ins.SendedFindNodeNumber += 1
+			})
 		}
 	}
 	return nil
@@ -134,6 +161,8 @@ func (hg *HashInfoGetter) RecvAndDispatch() error {
 					hg.DispatchReq(buf[:rn], protoSimple.Q, remoteAddr)
 				} else if protoSimple.Y == "r" {
 					hg.DispatchRes(buf[:rn], protoSimple.T)
+				} else if protoSimple.Y == "e" {
+					hg.DispatchError(buf[:rn], protoSimple.T)
 				} else {
 					log.Warningf("error \"y\": %v from: %v", protoSimple.Y, remoteAddr)
 				}
@@ -157,26 +186,58 @@ func (hg *HashInfoGetter) DispatchReq(buf []byte, q string, remoteAddr *net.UDPA
 				hg.Ins.SafeDo(func() {
 					hg.Ins.ReceivedPingNumber += 1
 				})
+				hg.HandleReqPing(req.(*hashinfocommon.ReqPing), remoteAddr)
+
 			case *hashinfocommon.ReqFindNode:
 				hg.Ins.SafeDo(func() {
 					hg.Ins.ReceivedFindNodeNumber += 1
 				})
+				hg.HandleReqFindNode(req.(*hashinfocommon.ReqFindNode), remoteAddr)
+
 			case *hashinfocommon.ReqGetPeers:
 				hg.Ins.SafeDo(func() {
 					hg.Ins.ReceivedGetPeersNumber += 1
 				})
 				hg.HandleReqGetPeers(req.(*hashinfocommon.ReqGetPeers), remoteAddr)
+
 			case *hashinfocommon.ReqAnnouncePeer:
 				hg.Ins.SafeDo(func() {
 					hg.Ins.ReceivedGetAnnouncePeerNumber += 1
 				})
 				hg.HandleReqAnnouncePeer(req.(*hashinfocommon.ReqAnnouncePeer), remoteAddr)
+
 			default:
 				panic("no way")
 			}
 		}
 	} else {
 		log.Warningf("can't not find prototype %v", q)
+	}
+}
+
+func (hg *HashInfoGetter) HandleReqPing(reqPing *hashinfocommon.ReqPing, remoteAddr *net.UDPAddr) {
+	resPing := &hashinfocommon.ResPing{T: reqPing.T, Y: "r",
+		R: hashinfocommon.RPing{Id: reqPing.A.Id}}
+
+	if resBytes, err := bencode.EncodeBytes(resPing); err != nil {
+		log.Warningf("encode res err: %v", err)
+	} else {
+		if _, err = hg.serverConn.WriteToUDP(resBytes, remoteAddr); err != nil {
+			log.Warningf("write udp err: %v", err)
+		}
+	}
+}
+
+func (hg *HashInfoGetter) HandleReqFindNode(reqFineNode *hashinfocommon.ReqFindNode, remoteAddr *net.UDPAddr) {
+	resFindNode := &hashinfocommon.ResFindNode{T: reqFineNode.T, Y: "r",
+		R: hashinfocommon.RFindNode{Id: hg.selfId, Nodes: ""}}
+
+	if resBytes, err := bencode.EncodeBytes(resFindNode); err != nil {
+		log.Warningf("encode res err: %v", err)
+	} else {
+		if _, err = hg.serverConn.WriteToUDP(resBytes, remoteAddr); err != nil {
+			log.Warningf("write udp err: %v", err)
+		}
 	}
 }
 
@@ -256,41 +317,24 @@ func (hg *HashInfoGetter) HandleResFindNode(resFindNode *hashinfocommon.ResFindN
 			}
 			hg.uniqueNodePool[node.Id] = struct{}{}
 
-			hg.Ins.SafeDo(func() {
-				hg.Ins.Nodes = append(hg.Ins.Nodes, &node)
-			})
+			hg.FlowControl.WaitFlow()
 
-			tid := hg.tm.FetchAndAdd()
-			// selfId := node.Id[:10] + hashinfo.selfId[10:] TODO what is self id?
-			reqFindNode := &hashinfocommon.ReqFindNode{T: tid, Y: "q", Q: "find_node",
-				A: hashinfocommon.AFindNode{Id: hg.selfId, Target: helpful.RandomString(20)}}
-
-			if reqBytes, err := bencode.EncodeBytes(reqFindNode); err != nil {
-				log.Warningf("encode err: %v", err)
-			} else {
-				if nodeAddr, err := net.ResolveUDPAddr("udp", node.Addr); err != nil {
-					log.Warningf("resolve udp addr err: %v", err)
-				} else {
-					if err = hg.sendReq(reqBytes, nodeAddr, tid, (*hashinfocommon.ResFindNode)(nil)); err != nil {
-						log.Warningf("write udp err: %v", err)
-					}
-					hg.Ins.SafeDo(func() {
-						hg.Ins.SendedFindNodeNumber += 1
-					})
-				}
+			if err := hg.SendFindNode(node.Addr, hg.selfId, node.Id[:15]+hg.selfId[15:]); err != nil {
+				log.Warningf("send find_node err: %v", err)
 			}
 		}
 	}
 }
 
-func (hg *HashInfoGetter) sendReq(reqBytes []byte, remoteAddr *net.UDPAddr, tid string, resType interface{}) error {
-	if _, err := hg.serverConn.WriteToUDP(reqBytes, remoteAddr); err != nil {
-		return err
-	} else {
-		hg.resPrototypeDict[tid] = reflect.TypeOf(resType)
+func (hg *HashInfoGetter) DispatchError(buf []byte, tid string) {
+	if _, ok := hg.resPrototypeDict[tid]; ok {
+		delete(hg.resPrototypeDict, tid)
+
 		hg.Ins.SafeDo(func() {
-			hg.Ins.UnReplyTid[tid] = struct{}{}
+			hg.Ins.ReceivedErrors += 1
 		})
-		return nil
+
+	} else {
+		log.Warningf("received a tid not match res, tid: %v", tid)
 	}
 }

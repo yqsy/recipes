@@ -91,15 +91,15 @@ func (waterMask *SendWaterMask) RiseMask(n uint32) {
 
 func (waterMask *SendWaterMask) DropMask(mask uint32) {
 	waterMask.mtx.Lock()
-	defer waterMask.mtx.Unlock()
 	waterMask.waterMask = 0
+	waterMask.mtx.Unlock()
 	waterMask.cond.Signal()
 }
 
 func (waterMask *SendWaterMask) DropMaskTo(mask uint32) {
 	waterMask.mtx.Lock()
-	defer waterMask.mtx.Unlock()
 	waterMask.waterMask = mask
+	waterMask.mtx.Unlock()
 	waterMask.cond.Signal()
 }
 
