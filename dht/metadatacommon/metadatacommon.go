@@ -48,7 +48,7 @@ type RequestPack struct {
 }
 
 // http://www.bittorrent.org/beps/bep_0010.html
-type Packet struct {
+type ExtPacket struct {
 	Len int32
 	// bittorrent message ID, = 20
 	BitMsgId byte
@@ -57,14 +57,13 @@ type Packet struct {
 	Payload  []byte
 }
 
-func (packet *Packet) IsHandShake() bool {
-	return packet.ExtMsgId == HandShake
+type Packet struct {
+	Len      int32
+	BitMsgId byte
+	Payload  []byte
 }
 
-func (packet *Packet) IsExtended() bool {
-	return packet.BitMsgId == Extended
-}
-
+// 冗余一点,没关系了,这个协议太恶心了
 func ReadAPacket(conn net.Conn) (*Packet, error) {
 	bufReader := bufio.NewReader(conn)
 	if first4bytes, err := bufReader.Peek(4); err != nil {
@@ -81,8 +80,8 @@ func ReadAPacket(conn net.Conn) (*Packet, error) {
 				return nil, errors.New("msg size is 1, no payload")
 			} else if Len == 0 {
 				return nil, errors.New("msg size is 0, keep-live? ")
-			} else if Len > MaxBufferLen {
-				return nil, errors.New(fmt.Sprintf("peer msg too long: %v", Len))
+			} else if Len > MaxBufferLen || Len < 0 {
+				return nil, errors.New(fmt.Sprintf("peer msg len error: %v", Len))
 			}
 
 			rbuf := make([]byte, Len+4 /*include first4bytes*/)
@@ -95,6 +94,51 @@ func ReadAPacket(conn net.Conn) (*Packet, error) {
 			packet := &Packet{}
 			packet.Len, _ = helpful.ReadInt32(rbuf[:4])
 			packet.BitMsgId = rbuf[4]
+			packet.Payload = rbuf[5:]
+
+			return packet, nil
+		}
+	}
+}
+
+func (ep *ExtPacket) IsHandShake() bool {
+	return ep.ExtMsgId == HandShake
+}
+
+func (ep *ExtPacket) IsExtended() bool {
+	return ep.BitMsgId == Extended
+}
+
+func ReadAExtPacket(conn net.Conn) (*ExtPacket, error) {
+	bufReader := bufio.NewReader(conn)
+	if first4bytes, err := bufReader.Peek(4); err != nil {
+		return nil, err
+	} else {
+		if Len, err := helpful.ReadInt32(first4bytes); err != nil {
+			return nil, err
+		} else {
+
+			// http://jonas.nitro.dk/bittorrent/bittorrent-rfc.html 6.2
+			// If a message has no payload, its size is 1.
+			// Messages of size 0 MAY be sent periodically as keep-alive messages.
+			if Len == 1 {
+				return nil, errors.New("msg size is 1, no payload")
+			} else if Len == 0 {
+				return nil, errors.New("msg size is 0, keep-live? ")
+			} else if Len > MaxBufferLen || Len < 0 {
+				return nil, errors.New(fmt.Sprintf("peer msg len error: %v", Len))
+			}
+
+			rbuf := make([]byte, Len+4 /*include first4bytes*/)
+
+			rn, err := io.ReadFull(bufReader, rbuf)
+			if err != nil || rn != len(rbuf) {
+				return nil, err
+			}
+
+			packet := &ExtPacket{}
+			packet.Len, _ = helpful.ReadInt32(rbuf[:4])
+			packet.BitMsgId = rbuf[4]
 			packet.ExtMsgId = rbuf[5]
 			packet.Payload = rbuf[6:]
 
@@ -103,7 +147,7 @@ func ReadAPacket(conn net.Conn) (*Packet, error) {
 	}
 }
 
-func WriteAPacket(conn net.Conn, bitMsgId, extMsgId byte, payload []byte) error {
+func WriteAExtPacket(conn net.Conn, bitMsgId, extMsgId byte, payload []byte) error {
 	var Len int32 = 2 + int32(len(payload))
 
 	var buf bytes.Buffer

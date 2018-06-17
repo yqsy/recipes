@@ -278,8 +278,14 @@ func (hg *HashInfoGetter) HandleReqFindNode(reqFineNode *hashinfocommon.ReqFindN
 func (hg *HashInfoGetter) HandleReqGetPeers(reqGetPeers *hashinfocommon.ReqGetPeers, remoteAddr *net.UDPAddr) {
 	// TODO what is self id?
 	// TODO what is token?
+
+	var token string
+	if len(reqGetPeers.A.InfoHash) >= TokenLen {
+		token = reqGetPeers.A.InfoHash[:TokenLen]
+	}
+
 	resGetPeers := &hashinfocommon.ResGetPeers{T: reqGetPeers.T, Y: "r",
-		R: hashinfocommon.RGetPeers{Id: hg.selfId, Token: reqGetPeers.A.InfoHash[:TokenLen], Nodes: ""}}
+		R: hashinfocommon.RGetPeers{Id: hg.selfId, Token: token, Nodes: ""}}
 
 	if resBytes, err := bencode.EncodeBytes(resGetPeers); err != nil {
 		log.Warningf("encode res err: %v", err)
@@ -334,7 +340,7 @@ func (hg *HashInfoGetter) DispatchRes(buf []byte, tid string) {
 			}
 		}
 	} else {
-		log.Warningf("not match res received tid: %v,drop it", helpful.Get10Hex(tid))
+		//log.Warningf("not match res received tid: %v,drop it", helpful.Get10Hex(tid))
 	}
 }
 
