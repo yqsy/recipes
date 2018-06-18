@@ -5,6 +5,7 @@
 - [3. 实现思路](#3-实现思路)
 - [4. find_node](#4-find_node)
 - [5. 恶心的地方](#5-恶心的地方)
+- [6. 实现bencode解析](#6-实现bencode解析)
 
 <!-- /TOC -->
 
@@ -119,4 +120,20 @@ http://www.bittorrent.org/beps/bep_0009.html
 
 
 extension message  你搞一个类似json表达格式的协议也就算了,但是能把二进制数据好好表示吗,跟在数据后面是啥意思?
+
+<a id="markdown-6-实现bencode解析" name="6-实现bencode解析"></a>
+# 6. 实现bencode解析
+
+
+
+把json拿来对比
+
+数据类型|实例值|解析思路|存储|bencode
+-|-|-|-|-
+null|null|n开头|nil|
+boolean|true false| t f 开头|bool|
+string|""|"开头|string|数字:字符串内容 (4:spam)
+number|浮点数|默认|float64| i开头e末尾 (i42e)
+array|[]|[开头|[]interface{}| l开头e末尾 (l4:spami42ee)
+object|{...}|{开头|map[string]interface{}| d开头e末尾 (d3:bar4:spam3:fooi42ee)
 
