@@ -27,13 +27,13 @@ func toBencodeString(in string) string {
 type Value struct {
 	Kind Kind
 
-	String_ *string
+	String_ string
 
-	Number *float64
+	Number float64
 
-	Array *[]*Value
+	Array []*Value
 
-	Object *map[string]*Value
+	Object map[string]*Value
 }
 
 // convert to json like string
@@ -45,7 +45,7 @@ func (value *Value) Prettify() string {
 		return fmt.Sprintf("%v", value.GetNumber())
 	} else if value.Kind == Array {
 		prettify := "["
-		a := *value.GetArray()
+		a := value.GetArray()
 		for i := 0; i < len(a); i++ {
 			prettify += a[i].Prettify() + ","
 		}
@@ -55,7 +55,7 @@ func (value *Value) Prettify() string {
 		return prettify + "]"
 	} else if value.Kind == Object {
 		prettify := "{"
-		o := *value.GetObject()
+		o := value.GetObject()
 		for k, v := range o {
 			prettify += fmt.Sprintf("%v: %v,", k, v.Prettify())
 		}
@@ -75,14 +75,14 @@ func (value *Value) Encode() string {
 		return fmt.Sprintf("i%ve", value.GetNumber())
 	} else if value.Kind == Array {
 		prettify := "l"
-		a := *value.GetArray()
+		a := value.GetArray()
 		for i := 0; i < len(a); i++ {
 			prettify += a[i].Prettify()
 		}
 		return prettify + "e"
 	} else if value.Kind == Object {
 		prettify := "d"
-		o := *value.GetObject()
+		o := value.GetObject()
 		for k, v := range o {
 			fmt.Sprintf("%v%v", toBencodeString(k), v.Encode())
 		}
@@ -93,26 +93,18 @@ func (value *Value) Encode() string {
 }
 
 func (value *Value) GetString() string {
-	if value.Kind == String || value.String_ != nil {
-		return *value.String_
-	} else {
-		return ""
-	}
+	return value.String_
 }
 
 func (value *Value) GetNumber() float64 {
-	if value.Kind == Number {
-		return *value.Number
-	} else {
-		return 0.0
-	}
+	return value.Number
 }
 
-func (value *Value) GetArray() *[]*Value {
+func (value *Value) GetArray() []*Value {
 	return value.Array
 }
 
-func (value *Value) GetObject() *map[string]*Value {
+func (value *Value) GetObject() map[string]*Value {
 	return value.Object
 }
 
@@ -166,7 +158,7 @@ func (ctx *Context) ParseString() (*Value, error) {
 	if string_, err := ctx.GetString(); err != nil {
 		return nil, err
 	} else {
-		return &Value{Kind: String, String_: &string_}, nil
+		return &Value{Kind: String, String_: string_}, nil
 	}
 }
 
@@ -193,7 +185,7 @@ func (ctx *Context) ParseNumber() (*Value, error) {
 
 	}
 
-	return &Value{Kind: Number, Number: &number}, nil
+	return &Value{Kind: Number, Number: number}, nil
 }
 
 func (ctx *Context) ParseArray() (*Value, error) {
@@ -209,13 +201,7 @@ func (ctx *Context) ParseArray() (*Value, error) {
 			return nil, err
 		}
 
-		// save to array
-		if value.Array == nil {
-			a := make([]*Value, 0)
-			value.Array = &a
-		}
-
-		*value.Array = append(*value.Array, ele)
+		value.Array = append(value.Array, ele)
 
 		// read 'e' represent end of array
 		if err := ctx.RemoveACharacter('e'); err != nil {
@@ -248,10 +234,10 @@ func (ctx *Context) ParseObject() (*Value, error) {
 		// save to map
 		if value.Object == nil {
 			m := make(map[string]*Value)
-			value.Object = &m
+			value.Object = m
 		}
 
-		(*value.Object)[key] = attribute
+		value.Object[key] = attribute
 
 		// read 'e' represent end of object
 		if err := ctx.RemoveACharacter('e'); err != nil {
@@ -285,14 +271,14 @@ func (ctx *Context) ParseValue() (*Value, error) {
 }
 
 type Packet struct {
-	value *Value
+	Value *Value
 }
 
 func (p *Packet) Encode() (string, error) {
-	if p.value == nil {
+	if p.Value == nil {
 		return "", errors.New(" value is nil")
 	}
-	return p.value.Encode(), nil
+	return p.Value.Encode(), nil
 }
 
 func Decode(b string) (*Packet, error) {
@@ -300,6 +286,6 @@ func Decode(b string) (*Packet, error) {
 	if value, err := ctx.ParseValue(); err != nil {
 		return nil, err
 	} else {
-		return &Packet{value: value}, nil
+		return &Packet{Value: value}, nil
 	}
 }
