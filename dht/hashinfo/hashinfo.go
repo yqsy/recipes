@@ -5,7 +5,6 @@ import (
 	"github.com/yqsy/recipes/dht/helpful"
 	"github.com/yqsy/recipes/dht/transaction"
 	"github.com/yqsy/recipes/dht/hashinfocommon"
-	"github.com/zeebo/bencode"
 	"reflect"
 	"github.com/yqsy/recipes/dht/inspector"
 	"github.com/yqsy/recipes/dht/metadata"
@@ -13,6 +12,7 @@ import (
 	"github.com/op/go-logging"
 	"github.com/yqsy/recipes/dht/flowcontrol"
 	"time"
+	"github.com/yqsy/recipes/dht/bencode"
 )
 
 var log = logging.MustGetLogger("dht")
@@ -75,11 +75,6 @@ func NewHashInfoGetter(ins *inspector.Inspector) *HashInfoGetter {
 	hg.MetaSourceChan = make(chan *metadata.MetaSource, 1024)
 	hg.Ins = ins
 	hg.FlowControl = flowcontrol.NewFlowControl()
-
-	hg.reqPrototypeDict["ping"] = reflect.TypeOf((*hashinfocommon.ReqPing)(nil))
-	hg.reqPrototypeDict["find_node"] = reflect.TypeOf((*hashinfocommon.ReqFindNode)(nil))
-	hg.reqPrototypeDict["get_peers"] = reflect.TypeOf((*hashinfocommon.ReqGetPeers)(nil))
-	hg.reqPrototypeDict["announce_peer"] = reflect.TypeOf((*hashinfocommon.ReqAnnouncePeer)(nil))
 
 	hg.Ins.SafeDo(func() {
 		hg.Ins.BasicNodes = hg.dhtNodes
@@ -185,8 +180,11 @@ func (hg *HashInfoGetter) SendJoin() error {
 
 func (hg *HashInfoGetter) SendFindNode(nodeAddr string, selfId, targetId string) error {
 	tid := hg.tm.FetchAndAdd()
-	reqFindNode := &hashinfocommon.ReqFindNode{T: tid, Y: "q", Q: "find_node",
-		A: hashinfocommon.AFindNode{Id: selfId, Target: targetId}}
+	//reqFindNode := &hashinfocommon.ReqFindNode{T: tid, Y: "q", Q: "find_node",
+	//	A: hashinfocommon.AFindNode{Id: selfId, Target: targetId}}
+
+
+
 
 	if reqBytes, err := bencode.EncodeBytes(reqFindNode); err != nil {
 		return err

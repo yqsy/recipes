@@ -116,5 +116,5 @@ func TestPrettify(t *testing.T) {
 	}
 
 	fmt.Println(packet.Value.Prettify())
-	
+
 }
