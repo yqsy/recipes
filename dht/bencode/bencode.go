@@ -108,6 +108,11 @@ func (value *Value) Encode() string {
 	}
 }
 
+func Decode(b string) (*Value, error) {
+	ctx := &Context{b: b}
+	return ctx.ParseValue()
+}
+
 type Context struct {
 	b string
 }
@@ -267,25 +272,5 @@ func (ctx *Context) ParseValue() (*Value, error) {
 		return ctx.ParseObject()
 	default:
 		return nil, errors.New(fmt.Sprintf("error character: %v", c))
-	}
-}
-
-type Packet struct {
-	Value *Value
-}
-
-func (p *Packet) Encode() (string, error) {
-	if p.Value == nil {
-		return "", errors.New(" value is nil")
-	}
-	return p.Value.Encode(), nil
-}
-
-func Decode(b string) (*Packet, error) {
-	ctx := &Context{b: b}
-	if value, err := ctx.ParseValue(); err != nil {
-		return nil, err
-	} else {
-		return &Packet{Value: value}, nil
 	}
 }
