@@ -29,18 +29,34 @@ type Value struct {
 
 	String_ string
 
-	Number float64
+	Number int
 
 	Array []*Value
 
 	Object map[string]*Value
 }
 
+func (value *Value) GetString() string {
+	return value.String_
+}
+
+func (value *Value) GetNumber() int {
+	return value.Number
+}
+
+func (value *Value) GetArray() []*Value {
+	return value.Array
+}
+
+func (value *Value) GetObject() map[string]*Value {
+	return value.Object
+}
+
 // convert to json like string
 // use https://jsonlint.com/ to prettify more!
 func (value *Value) Prettify() string {
 	if value.Kind == String {
-		return value.GetString()
+		return `"` + value.GetString() + `"`
 	} else if value.Kind == Number {
 		return fmt.Sprintf("%v", value.GetNumber())
 	} else if value.Kind == Array {
@@ -57,7 +73,7 @@ func (value *Value) Prettify() string {
 		prettify := "{"
 		o := value.GetObject()
 		for k, v := range o {
-			prettify += fmt.Sprintf("%v: %v,", k, v.Prettify())
+			prettify += fmt.Sprintf(`"%v": %v,`, k, v.Prettify())
 		}
 		if len(prettify) > 0 && prettify[len(prettify)-1] == ',' {
 			prettify = prettify[:len(prettify)-1]
@@ -77,35 +93,19 @@ func (value *Value) Encode() string {
 		prettify := "l"
 		a := value.GetArray()
 		for i := 0; i < len(a); i++ {
-			prettify += a[i].Prettify()
+			prettify += a[i].Encode()
 		}
 		return prettify + "e"
 	} else if value.Kind == Object {
 		prettify := "d"
 		o := value.GetObject()
 		for k, v := range o {
-			fmt.Sprintf("%v%v", toBencodeString(k), v.Encode())
+			prettify += fmt.Sprintf("%v%v", toBencodeString(k), v.Encode())
 		}
 		return prettify + "e"
 	} else {
 		panic("impossible")
 	}
-}
-
-func (value *Value) GetString() string {
-	return value.String_
-}
-
-func (value *Value) GetNumber() float64 {
-	return value.Number
-}
-
-func (value *Value) GetArray() []*Value {
-	return value.Array
-}
-
-func (value *Value) GetObject() map[string]*Value {
-	return value.Object
 }
 
 type Context struct {
@@ -173,7 +173,7 @@ func (ctx *Context) ParseNumber() (*Value, error) {
 		p++
 	}
 
-	number, err := strconv.ParseFloat(ctx.b[:p], 64)
+	number, err := strconv.ParseInt(ctx.b[:p], 10, 64)
 	if err != nil {
 		return nil, errors.New("syntax error")
 	}
@@ -185,7 +185,7 @@ func (ctx *Context) ParseNumber() (*Value, error) {
 
 	}
 
-	return &Value{Kind: Number, Number: number}, nil
+	return &Value{Kind: Number, Number: int(number)}, nil
 }
 
 func (ctx *Context) ParseArray() (*Value, error) {
@@ -204,7 +204,7 @@ func (ctx *Context) ParseArray() (*Value, error) {
 		value.Array = append(value.Array, ele)
 
 		// read 'e' represent end of array
-		if err := ctx.RemoveACharacter('e'); err != nil {
+		if err := ctx.RemoveACharacter('e'); err == nil {
 			break
 		}
 	}
@@ -240,7 +240,7 @@ func (ctx *Context) ParseObject() (*Value, error) {
 		value.Object[key] = attribute
 
 		// read 'e' represent end of object
-		if err := ctx.RemoveACharacter('e'); err != nil {
+		if err := ctx.RemoveACharacter('e'); err == nil {
 			break
 		}
 	}
