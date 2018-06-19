@@ -8,10 +8,10 @@ import (
 	"github.com/yqsy/recipes/dht/helpful"
 	"errors"
 	"github.com/yqsy/recipes/dht/metadatacommon"
-	"github.com/zeebo/bencode"
 	"github.com/op/go-logging"
 	"time"
 	"fmt"
+	"github.com/yqsy/recipes/dht/bencode"
 )
 
 var log = logging.MustGetLogger("dht")
@@ -62,31 +62,50 @@ func (mg *MetaGetter) HandleShake(conn net.Conn, metaSource *MetaSource) error {
 	return nil
 }
 
+// req:
+// {
+//	  m: {
+//	      "ut_metadata": 1
+//  	}
+// }
+
+// res:
+//{
+//	m: {
+//	    "ut_metadata": int   // 拿来下次请求时用
+//	}
+//	"metadata_size": int  // 分割piece块,请求piece
+//}
 // http://www.bittorrent.org/beps/bep_0010.html
-func (mg *MetaGetter) ExtHandleShake(conn net.Conn, metaSource *MetaSource) (*metadatacommon.ExtHandshake, error) {
-	extHandShake := &metadatacommon.ExtHandshake{M: metadatacommon.M{Ut_metadata: metadatacommon.Data}}
-	if reqBytes, err := bencode.EncodeBytes(extHandShake); err != nil {
+func (mg *MetaGetter) ExtHandleShake(conn net.Conn, metaSource *MetaSource) (map[string]interface{}, error) {
+	extHandShake := map[string]interface{}{
+		"m": map[string]interface{}{
+			"ut_metadata": 1,
+		},
+	}
+
+	reqBytes := []byte(bencode.Encode(extHandShake))
+	if err := metadatacommon.WriteAExtPacket(conn, metadatacommon.Extended, metadatacommon.HandShake, reqBytes); err != nil {
 		return nil, err
+	}
+
+	resPacket, err := metadatacommon.ReadAExtPacket(conn)
+	if err != nil {
+		return nil, err
+	}
+
+	if !resPacket.IsExtended() || !resPacket.IsHandShake() {
+		return nil, errors.New("extHandshake error")
+	}
+
+	if v, err := bencode.Decode(string(resPacket.Payload)); err != nil {
+		return nil, errors.New("extHandshake decode error")
 	} else {
-		if err = metadatacommon.WriteAExtPacket(conn, metadatacommon.Extended, metadatacommon.HandShake, reqBytes); err != nil {
+		if err = metadatacommon.CheckExtHandShakeRes(v); err != nil {
 			return nil, err
+		} else {
+			return v.(map[string]interface{}), nil
 		}
-
-		resPacket, err := metadatacommon.ReadAExtPacket(conn)
-		if err != nil {
-			return nil, err
-		}
-
-		if !resPacket.IsExtended() || !resPacket.IsHandShake() {
-			return nil, errors.New("extHandshake error")
-		}
-
-		extHandShakeRes := &metadatacommon.ExtHandshake{}
-		if err := bencode.DecodeBytes(resPacket.Payload, extHandShakeRes); err != nil {
-			return nil, err
-		}
-
-		return extHandShakeRes, nil
 	}
 }
 
@@ -105,38 +124,40 @@ func (mg *MetaGetter) GetBitField(conn net.Conn) ([]byte /*payload bitmap*/ , er
 	return resPacket.Payload, err
 }
 
-func (mg *MetaGetter) GetPieces(conn net.Conn, extHandshakeRes *metadatacommon.ExtHandshake) error {
-	piecesNum := extHandshakeRes.Metadata_size / BLOCK
-	if extHandshakeRes.Metadata_size%BLOCK != 0 {
+// http://www.bittorrent.org/beps/bep_0009.html
+func (mg *MetaGetter) GetPieces(conn net.Conn, extHandshakeRes map[string]interface{}) error {
+	utMetadata := extHandshakeRes["m"].(map[string]interface{})["ut_metadata"].(int)
+	metadataSize := extHandshakeRes["metadata_size"].(int)
+
+	piecesNum := metadataSize / BLOCK
+	if metadataSize%BLOCK != 0 {
 		piecesNum++
 	}
 
 	for i := 0; i < piecesNum; i++ {
-		request := metadatacommon.RequestPack{Msg_Type: metadatacommon.Request, Piece: i}
+		requset := map[string]interface{}{
+			"msg_type": metadatacommon.Request,
+			"piece":    i,
+		}
 
-		if reqBytes, err := bencode.EncodeBytes(request); err != nil {
+		reqBytes := []byte(bencode.Encode(requset))
+
+		if err := metadatacommon.WriteAExtPacket(conn, metadatacommon.Extended, byte(utMetadata), reqBytes); err != nil {
 			return err
 		} else {
-			if err = metadatacommon.WriteAExtPacket(conn, metadatacommon.Extended, byte(extHandshakeRes.M.Ut_metadata), reqBytes); err != nil {
-				return err
-			} else {
 
-				for {
-					resPacket, err := metadatacommon.ReadAExtPacket(conn)
+			for {
+				resPacket, err := metadatacommon.ReadAExtPacket(conn)
 
-					if err != nil {
-						return nil
-					}
-
-					_ = resPacket
-					// 不得不用一下别人的库了
-
+				if err != nil {
+					return nil
 				}
+
+				_ = resPacket
 
 			}
 		}
 	}
-
 	return nil
 }
 

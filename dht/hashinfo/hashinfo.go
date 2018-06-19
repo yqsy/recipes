@@ -371,8 +371,8 @@ func (hg *HashInfoGetter) DispatchError(err map[string]interface{}) {
 		})
 		code := err["e"].([]interface{})[0].(int)
 		description := err["e"].([]interface{})[1].(string)
-		log.Warningf("received a err: %v %v , tid: %v", code, description, tid)
+		log.Warningf("received a err: %v %v , tid: %v", code, description, helpful.Get10Hex(tid))
 	} else {
-		log.Warningf("received a tid not match res, tid: %v", tid)
+		log.Warningf("received a tid not match res, tid: %v", helpful.Get10Hex(tid))
 	}
 }

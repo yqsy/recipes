@@ -9,6 +9,7 @@ import (
 	"io"
 	"fmt"
 	"github.com/yqsy/recipes/dht/helpful"
+	"reflect"
 )
 
 // bittorrent message ID
@@ -21,7 +22,6 @@ const (
 	HandShake = 0
 )
 
-// ut_metadata?
 // msg_type?
 const (
 	Request = 0
@@ -32,20 +32,6 @@ const (
 const (
 	MaxBufferLen = 65536
 )
-
-type M struct {
-	Ut_metadata int `bencode:"ut_metadata"`
-}
-
-type ExtHandshake struct {
-	M             M   `bencode:"m"`
-	Metadata_size int `bencode:"metadata_size"`
-}
-
-type RequestPack struct {
-	Msg_Type int `bencode:"msg_type"`
-	Piece    int `bencode:"piece"`
-}
 
 // http://www.bittorrent.org/beps/bep_0010.html
 type ExtPacket struct {
@@ -160,4 +146,27 @@ func WriteAExtPacket(conn net.Conn, bitMsgId, extMsgId byte, payload []byte) err
 	} else {
 		return nil
 	}
+}
+
+func CheckExtHandShakeRes(b interface{}) error {
+	if obj, ok := b.(map[string]interface{}); !ok {
+		return errors.New("not an obj")
+	} else {
+		if m, ok := obj["m"]; !ok ||
+			reflect.TypeOf(m).Kind() != reflect.Map {
+			return errors.New("m error")
+		} else {
+			if ut_metadata, ok := m.(map[string]interface{})["ut_metadata"]; !ok ||
+				reflect.TypeOf(ut_metadata).Kind() != reflect.Int {
+				return errors.New("m.ut_metadata error")
+			}
+		}
+
+		if metadata_size, ok := obj["metadata_size"]; !ok ||
+			reflect.TypeOf(metadata_size).Kind() != reflect.Int {
+			return errors.New("metadata_size error")
+		}
+	}
+
+	return nil
 }
