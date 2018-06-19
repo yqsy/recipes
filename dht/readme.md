@@ -137,3 +137,9 @@ number|浮点数|默认|float64| i开头e末尾 (i42e)
 array|[]|[开头|[]interface{}| l开头e末尾 (l4:spami42ee)
 object|{...}|{开头|map[string]interface{}| d开头e末尾 (d3:bar4:spam3:fooi42ee)
 
+这个只是一个简单的工程,尽量简易以及容易使用,以下特性:
+
+* 二进制与Value树的转换, Encode, Decode 函数
+* 内置数据结构与Value树的转换
+  * (NewString, NewNumber, NewArray, NewObject) 是内置数据结构转Value树
+  * Value树转内置结构

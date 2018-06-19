@@ -183,7 +183,7 @@ func (hg *HashInfoGetter) SendFindNode(nodeAddr string, selfId, targetId string)
 	//reqFindNode := &hashinfocommon.ReqFindNode{T: tid, Y: "q", Q: "find_node",
 	//	A: hashinfocommon.AFindNode{Id: selfId, Target: targetId}}
 
-
+	//reqFindNode := bencode.Value{Kind: bencode.Object,
 
 
 	if reqBytes, err := bencode.EncodeBytes(reqFindNode); err != nil {

@@ -2,14 +2,8 @@ package bencode
 
 import (
 	"testing"
-	"math"
 	"fmt"
 )
-
-func isDoubleEqual(f1, f2 float64) bool {
-	const TOLERANCE = 0.000001
-	return math.Abs(f1-f2) < TOLERANCE
-}
 
 func TestDecode(t *testing.T) {
 
@@ -116,5 +110,14 @@ func TestPrettify(t *testing.T) {
 	}
 
 	fmt.Println(value.Prettify())
+
+}
+
+func TestEncodeNew(t *testing.T) {
+	// 1. 数组包数组
+
+	var shit = []int{1, 2, 3}
+
+	value, err := NewArray(shit)
 
 }

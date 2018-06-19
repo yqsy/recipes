@@ -109,8 +109,71 @@ func (value *Value) Encode() string {
 }
 
 func Decode(b string) (*Value, error) {
-	ctx := &Context{b: b}
+	ctx := Context{b: b}
 	return ctx.ParseValue()
+}
+
+func NewString(in string) *Value {
+	return &Value{Kind: String, String_: in}
+}
+
+func NewNumber(in int) *Value {
+	return &Value{Kind: Number, Number: in}
+}
+
+func NewArray(in interface{}) (*Value, error) {
+	newValue := make([]*Value, 0)
+	for _, v := range in.([]interface{}) {
+		switch v.(type) {
+		case int:
+			newValue = append(newValue, NewNumber(v.(int)))
+		case string:
+			newValue = append(newValue, NewString(v.(string)))
+		case []interface{}:
+			if newArray, err := NewArray(v.([]interface{})); err != nil {
+				return nil, err
+			} else {
+				newValue = append(newValue, newArray)
+			}
+		case map[string]interface{}:
+			if newObject, err := NewObject(v.(map[string]interface{})); err != nil {
+				return nil, err
+			} else {
+				newValue = append(newValue, newObject)
+			}
+		default:
+			return nil, errors.New("only support int, string, slice and map")
+		}
+	}
+
+	return &Value{Kind: Array, Array: newValue}, nil
+}
+
+func NewObject(in interface{}) (*Value, error) {
+	newValue := make(map[string]*Value)
+	for k, v := range in.(map[string]interface{}) {
+		switch v.(type) {
+		case int:
+			newValue[k] = NewNumber(v.(int))
+		case string:
+			newValue[k] = NewString(v.(string))
+		case []interface{}:
+			if newArray, err := NewArray(v.([]interface{})); err != nil {
+				return nil, err
+			} else {
+				newValue[k] = newArray
+			}
+		case map[string]interface{}:
+			if newObject, err := NewObject(v.(map[string]interface{})); err != nil {
+				return nil, err
+			} else {
+				newValue[k] = newObject
+			}
+		default:
+			return nil, errors.New("only support int, string, slice and map")
+		}
+	}
+	return &Value{Kind: Object, Object: newValue}, nil
 }
 
 type Context struct {
