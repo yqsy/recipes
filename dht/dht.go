@@ -26,23 +26,23 @@ func main() {
 	backendFormatter := logging.NewBackendFormatter(backend, format)
 	logging.SetBackend(backendFormatter)
 
-	ins := inspector.Inspector{UnReplyTid: make(map[string]struct{})}
+	ins := inspector.NewInspector()
 
-	hashInfoGetter := hashinfo.NewHashInfoGetter(&ins)
+	hashInfoGetter := hashinfo.NewHashInfoGetter(ins)
 	go func() {
 		if err := hashInfoGetter.Run(); err != nil {
 			panic(err)
 		}
 	}()
 
-	metaGetter := metadata.MetaGetter{Ins: &ins}
+	metaGetter := metadata.MetaGetter{Ins: ins}
 	go func() {
 		if err := metaGetter.Run(hashInfoGetter.MetaSourceChan); err != nil {
 			panic(err)
 		}
 	}()
 
-	helpInspector := inspector.HelpInspect{Ins: &ins}
+	helpInspector := inspector.HelpInspect{Ins: ins}
 	gin.SetMode(gin.ReleaseMode)
 	gin.DefaultWriter = ioutil.Discard
 

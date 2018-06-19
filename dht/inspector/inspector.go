@@ -46,6 +46,10 @@ type Inspector struct {
 	mtx sync.Mutex
 }
 
+func NewInspector() *Inspector {
+	return &Inspector{UnReplyTid: make(map[string]struct{})}
+}
+
 type BasicInfo struct {
 	BasicNodes                    []string `json:"BasicNodes"`
 	SelfId                        string   `json:"SelfId"`

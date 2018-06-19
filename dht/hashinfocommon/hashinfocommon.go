@@ -7,10 +7,6 @@ import (
 	"strconv"
 )
 
-const (
-	TokenLen = 2
-)
-
 type Node struct {
 	Id   string
 	Addr string
@@ -25,23 +21,39 @@ func CheckDictIdValid(dict map[string]interface{}) error {
 	return nil
 }
 
+func CheckDictInfoHashValid(dict map[string]interface{}) error {
+	if infohash, ok := dict["info_hash"]; !ok ||
+		reflect.TypeOf(infohash).Kind() != reflect.String ||
+		len(infohash.(string)) != 20 {
+		return errors.New("error id")
+	}
+	return nil
+}
+
 func GetObjWithCheck(b interface{}) (map[string]interface{}, error) {
 	if obj, ok := b.(map[string]interface{}); !ok {
 		return nil, errors.New("not an obj")
 	} else {
+
+		// transaction id
 		if t, ok := obj["t"]; !ok || reflect.TypeOf(t).Kind() != reflect.String {
 			return nil, errors.New("error key \"t\"")
 		}
 
+		// msg type
 		if y, ok := obj["y"]; !ok || reflect.TypeOf(y).Kind() != reflect.String {
 			return nil, errors.New("error key \"y\"")
 		} else {
 
 			// req
 			if y == "q" {
+
+				// req type
 				if q, ok := obj["q"]; !ok || reflect.TypeOf(q).Kind() != reflect.String {
 					return nil, errors.New("error key \"q\"")
 				}
+
+				// req parameter
 				if a, ok := obj["a"]; !ok || reflect.TypeOf(a).Kind() != reflect.Map {
 					return nil, errors.New("error key \"a\"")
 				}
@@ -49,6 +61,8 @@ func GetObjWithCheck(b interface{}) (map[string]interface{}, error) {
 
 			// response
 			if y == "r" {
+
+				// response parameter
 				if r, ok := obj["r"]; !ok || reflect.TypeOf(r).Kind() != reflect.Map {
 					return nil, errors.New("error key \"r\"")
 				}
@@ -92,33 +106,19 @@ func CheckResFindNodeValid(res map[string]interface{}) error {
 
 func CheckReqPingValid(req map[string]interface{}) error {
 	a := req["a"].(map[string]interface{})
-
-	if err := CheckDictIdValid(a); err != nil {
-		return err
-	}
-
-	return nil
+	return CheckDictIdValid(a)
 }
 
 func CheckReqGetPeersValid(req map[string]interface{}) error {
 	a := req["a"].(map[string]interface{})
-
-	if hashinfo, ok := a["info_hash"]; !ok ||
-		reflect.TypeOf(hashinfo).Kind() != reflect.String ||
-		len(hashinfo.(string)) < TokenLen {
-		return errors.New("error a.hash_info")
-	}
-
-	return nil
+	return CheckDictInfoHashValid(a)
 }
 
 func CheckReqAnnouncePeerValid(req map[string]interface{}) error {
 	a := req["a"].(map[string]interface{})
 
-	if hashinfo, ok := a["info_hash"]; !ok ||
-		reflect.TypeOf(hashinfo).Kind() != reflect.String ||
-		len(hashinfo.(string)) != 20 {
-		return errors.New("error a.hash_info")
+	if err := CheckDictInfoHashValid(a); err != nil {
+		return err
 	}
 
 	if port, ok := a["port"]; !ok ||

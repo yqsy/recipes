@@ -93,22 +93,22 @@ func (hg *HashInfoGetter) Run() error {
 		hg.FlowControl.Increasing(512)
 	}()
 
-	recvUdpMsgChan := make(chan *UdpMsg)
+	produceUdpMsgChan := make(chan *UdpMsg)
 	consumeOkChan := make(chan struct{})
 
 	go func() {
-		hg.ProducingUdpMsg(consumeOkChan, recvUdpMsgChan)
+		hg.ProducingUdpMsg(consumeOkChan, produceUdpMsgChan)
 	}()
 
-	joinTicker := time.NewTicker(time.Second * 5)
+	rejoinTicker := time.NewTicker(time.Second * 5)
 
 	consumeOkChan <- struct{}{} // start
 	for {
 		select {
-		case recvUdpMsg := <-recvUdpMsgChan:
-			hg.DispatchReqAndRes(recvUdpMsg.Packet, recvUdpMsg.RemoteAddr)
-			consumeOkChan <- struct{}{}
-		case <-joinTicker.C:
+		case udpMsg := <-produceUdpMsgChan:
+			hg.DispatchReqAndRes(udpMsg.Packet, udpMsg.RemoteAddr)
+			consumeOkChan <- struct{}{} // cousume this msg ok. begin to receive next one
+		case <-rejoinTicker.C:
 			if err := hg.SendJoin(); err != nil {
 				log.Warningf("send join err: %v", err)
 			}
@@ -116,7 +116,7 @@ func (hg *HashInfoGetter) Run() error {
 	}
 }
 
-func (hg *HashInfoGetter) ProducingUdpMsg(consumOkChan chan struct{}, recvUdpMsgChan chan *UdpMsg) {
+func (hg *HashInfoGetter) ProducingUdpMsg(consumOkChan chan struct{}, produceUdpMsgChan chan *UdpMsg) {
 	buf := make([]byte, 2048)
 	for {
 		<-consumOkChan
@@ -126,7 +126,7 @@ func (hg *HashInfoGetter) ProducingUdpMsg(consumOkChan chan struct{}, recvUdpMsg
 		} else {
 			udpMsg := &UdpMsg{Packet: buf[:rn], RemoteAddr: remoteAddr}
 
-			recvUdpMsgChan <- udpMsg
+			produceUdpMsgChan <- udpMsg
 		}
 	}
 }
@@ -268,13 +268,12 @@ func (hg *HashInfoGetter) HandleReqFindNode(req map[string]interface{}, remoteAd
 }
 
 func (hg *HashInfoGetter) HandleReqGetPeers(req map[string]interface{}, remoteAddr *net.UDPAddr) {
-	// TODO what is self id?
 	// TODO what is token?
 
 	if err := hashinfocommon.CheckReqGetPeersValid(req); err != nil {
 		log.Warningf("not valid HandleReqGetPeers err: %v", err)
 	} else {
-		token := req["a"].(map[string]interface{})["info_hash"].(string)[:hashinfocommon.TokenLen]
+		token := req["a"].(map[string]interface{})["info_hash"].(string)[:2]
 
 		resGetPeers := map[string]interface{}{
 			"t": req["t"].(string),
