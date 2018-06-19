@@ -139,7 +139,6 @@ object|{...}|{开头|map[string]interface{}| d开头e末尾 (d3:bar4:spam3:fooi4
 
 这个只是一个简单的工程,尽量简易以及容易使用,以下特性:
 
-* 二进制与Value树的转换, Encode, Decode 函数
-* 内置数据结构与Value树的转换
-  * (NewString, NewNumber, NewArray, NewObject) 是内置数据结构转Value树
-  * Value树转内置结构
+* 二进制与数据结构的转换    decode
+* 数据结构与二进制的转换    encode
+* 数据结构的json打印,可读性 Prettify

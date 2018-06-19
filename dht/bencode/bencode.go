@@ -6,174 +6,77 @@ import (
 	"strconv"
 )
 
-type Kind int
-
-const (
-	String Kind = 0
-	Number      = 1
-	Array       = 2
-	Object      = 3
-)
-
 func isDigit(c byte) bool {
 	return c >= '0' && c <= '9'
-
 }
 
 func toBencodeString(in string) string {
 	return fmt.Sprintf("%v:%v", len(in), in)
 }
 
-type Value struct {
-	Kind Kind
-
-	String_ string
-
-	Number int
-
-	Array []*Value
-
-	Object map[string]*Value
-}
-
-func (value *Value) GetString() string {
-	return value.String_
-}
-
-func (value *Value) GetNumber() int {
-	return value.Number
-}
-
-func (value *Value) GetArray() []*Value {
-	return value.Array
-}
-
-func (value *Value) GetObject() map[string]*Value {
-	return value.Object
-}
-
 // convert to json like string
 // use https://jsonlint.com/ to prettify more!
-func (value *Value) Prettify() string {
-	if value.Kind == String {
-		return `"` + value.GetString() + `"`
-	} else if value.Kind == Number {
-		return fmt.Sprintf("%v", value.GetNumber())
-	} else if value.Kind == Array {
+func Prettify(v interface{}) string {
+	switch v.(type) {
+	case string:
+		return `"` + v.(string) + `"`
+	case int:
+		return strconv.Itoa(v.(int))
+	case []interface{}:
+		a := v.([]interface{})
 		prettify := "["
-		a := value.GetArray()
 		for i := 0; i < len(a); i++ {
-			prettify += a[i].Prettify() + ","
+			prettify += Prettify(a[i]) + ","
 		}
 		if len(prettify) > 0 && prettify[len(prettify)-1] == ',' {
 			prettify = prettify[:len(prettify)-1]
 		}
 		return prettify + "]"
-	} else if value.Kind == Object {
+
+	case map[string]interface{}:
+		o := v.(map[string]interface{})
 		prettify := "{"
-		o := value.GetObject()
 		for k, v := range o {
-			prettify += fmt.Sprintf(`"%v": %v,`, k, v.Prettify())
+			prettify += fmt.Sprintf(`"%v": %v,`, k, Prettify(v))
 		}
 		if len(prettify) > 0 && prettify[len(prettify)-1] == ',' {
 			prettify = prettify[:len(prettify)-1]
 		}
 		return prettify + "}"
-	} else {
-		panic("impossible")
+	default:
+		panic("only support string,int,[]interface{} and map[string]interface{}")
 	}
 }
 
-func (value *Value) Encode() string {
-	if value.Kind == String {
-		return toBencodeString(value.GetString())
-	} else if value.Kind == Number {
-		return fmt.Sprintf("i%ve", value.GetNumber())
-	} else if value.Kind == Array {
+func Encode(v interface{}) string {
+	switch v.(type) {
+	case string:
+		return toBencodeString(v.(string))
+	case int:
+		return fmt.Sprintf("i%ve", v.(int))
+	case []interface{}:
+		a := v.([]interface{})
 		prettify := "l"
-		a := value.GetArray()
 		for i := 0; i < len(a); i++ {
-			prettify += a[i].Encode()
+			prettify += Encode(a[i])
 		}
 		return prettify + "e"
-	} else if value.Kind == Object {
+	case map[string]interface{}:
+		o := v.(map[string]interface{})
 		prettify := "d"
-		o := value.GetObject()
 		for k, v := range o {
-			prettify += fmt.Sprintf("%v%v", toBencodeString(k), v.Encode())
+			prettify += fmt.Sprintf("%v%v", toBencodeString(k), Encode(v))
 		}
 		return prettify + "e"
-	} else {
-		panic("impossible")
+
+	default:
+		panic("only support string,int,[]interface{} and map[string]interface{}")
 	}
 }
 
-func Decode(b string) (*Value, error) {
+func Decode(b string) (interface{}, error) {
 	ctx := Context{b: b}
 	return ctx.ParseValue()
-}
-
-func NewString(in string) *Value {
-	return &Value{Kind: String, String_: in}
-}
-
-func NewNumber(in int) *Value {
-	return &Value{Kind: Number, Number: in}
-}
-
-func NewArray(in interface{}) (*Value, error) {
-	newValue := make([]*Value, 0)
-	for _, v := range in.([]interface{}) {
-		switch v.(type) {
-		case int:
-			newValue = append(newValue, NewNumber(v.(int)))
-		case string:
-			newValue = append(newValue, NewString(v.(string)))
-		case []interface{}:
-			if newArray, err := NewArray(v.([]interface{})); err != nil {
-				return nil, err
-			} else {
-				newValue = append(newValue, newArray)
-			}
-		case map[string]interface{}:
-			if newObject, err := NewObject(v.(map[string]interface{})); err != nil {
-				return nil, err
-			} else {
-				newValue = append(newValue, newObject)
-			}
-		default:
-			return nil, errors.New("only support int, string, slice and map")
-		}
-	}
-
-	return &Value{Kind: Array, Array: newValue}, nil
-}
-
-func NewObject(in interface{}) (*Value, error) {
-	newValue := make(map[string]*Value)
-	for k, v := range in.(map[string]interface{}) {
-		switch v.(type) {
-		case int:
-			newValue[k] = NewNumber(v.(int))
-		case string:
-			newValue[k] = NewString(v.(string))
-		case []interface{}:
-			if newArray, err := NewArray(v.([]interface{})); err != nil {
-				return nil, err
-			} else {
-				newValue[k] = newArray
-			}
-		case map[string]interface{}:
-			if newObject, err := NewObject(v.(map[string]interface{})); err != nil {
-				return nil, err
-			} else {
-				newValue[k] = newObject
-			}
-		default:
-			return nil, errors.New("only support int, string, slice and map")
-		}
-	}
-	return &Value{Kind: Object, Object: newValue}, nil
 }
 
 type Context struct {
@@ -222,17 +125,13 @@ func (ctx *Context) GetString() (string, error) {
 	return str, nil
 }
 
-func (ctx *Context) ParseString() (*Value, error) {
-	if string_, err := ctx.GetString(); err != nil {
-		return nil, err
-	} else {
-		return &Value{Kind: String, String_: string_}, nil
-	}
+func (ctx *Context) ParseString() (string, error) {
+	return ctx.GetString()
 }
 
-func (ctx *Context) ParseNumber() (*Value, error) {
+func (ctx *Context) ParseNumber() (int, error) {
 	if err := ctx.RemoveACharacter('i'); err != nil {
-		return nil, errors.New("syntax error")
+		return 0, errors.New("syntax error")
 	}
 
 	p := 0
@@ -243,25 +142,25 @@ func (ctx *Context) ParseNumber() (*Value, error) {
 
 	number, err := strconv.ParseInt(ctx.b[:p], 10, 64)
 	if err != nil {
-		return nil, errors.New("syntax error")
+		return 0, errors.New("syntax error")
 	}
 
 	ctx.b = ctx.b[p:]
 
 	if err = ctx.RemoveACharacter('e'); err != nil {
-		return nil, errors.New("syntax error")
+		return 0, errors.New("syntax error")
 
 	}
 
-	return &Value{Kind: Number, Number: int(number)}, nil
+	return int(number), nil
 }
 
-func (ctx *Context) ParseArray() (*Value, error) {
+func (ctx *Context) ParseArray() ([]interface{}, error) {
 	if err := ctx.RemoveACharacter('l'); err != nil {
 		return nil, errors.New("syntax error")
 	}
 
-	value := &Value{Kind: Array}
+	a := make([]interface{}, 0)
 	for {
 		// dispatch
 		ele, err := ctx.ParseValue()
@@ -269,22 +168,22 @@ func (ctx *Context) ParseArray() (*Value, error) {
 			return nil, err
 		}
 
-		value.Array = append(value.Array, ele)
+		a = append(a, ele)
 
 		// read 'e' represent end of array
 		if err := ctx.RemoveACharacter('e'); err == nil {
 			break
 		}
 	}
-	return value, nil
+	return a, nil
 }
 
-func (ctx *Context) ParseObject() (*Value, error) {
+func (ctx *Context) ParseObject() (map[string]interface{}, error) {
 	if err := ctx.RemoveACharacter('d'); err != nil {
 		return nil, errors.New("syntax error")
 	}
 
-	value := &Value{Kind: Object}
+	o := make(map[string]interface{})
 
 	for {
 		// read key
@@ -300,12 +199,7 @@ func (ctx *Context) ParseObject() (*Value, error) {
 		}
 
 		// save to map
-		if value.Object == nil {
-			m := make(map[string]*Value)
-			value.Object = m
-		}
-
-		value.Object[key] = attribute
+		o[key] = attribute
 
 		// read 'e' represent end of object
 		if err := ctx.RemoveACharacter('e'); err == nil {
@@ -313,10 +207,10 @@ func (ctx *Context) ParseObject() (*Value, error) {
 		}
 	}
 
-	return value, nil
+	return o, nil
 }
 
-func (ctx *Context) ParseValue() (*Value, error) {
+func (ctx *Context) ParseValue() (interface{}, error) {
 	c, err := ctx.PeekACharacter()
 	if err != nil {
 		return nil, err
