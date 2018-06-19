@@ -1,13 +1,13 @@
 package main
 
 import (
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/yqsy/recipes/dht/hashinfo"
-	"github.com/gin-gonic/gin"
-	"github.com/yqsy/recipes/dht/inspector"
-	"github.com/op/go-logging"
 	"os"
 	"io/ioutil"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/op/go-logging"
+	"github.com/gin-gonic/gin"
+	"github.com/yqsy/recipes/dht/hashinfo"
+	"github.com/yqsy/recipes/dht/inspector"
 	"github.com/yqsy/recipes/dht/metadata"
 )
 

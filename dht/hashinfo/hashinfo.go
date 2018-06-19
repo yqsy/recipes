@@ -5,7 +5,6 @@ import (
 	"github.com/yqsy/recipes/dht/helpful"
 	"github.com/yqsy/recipes/dht/transaction"
 	"github.com/yqsy/recipes/dht/hashinfocommon"
-	"reflect"
 	"github.com/yqsy/recipes/dht/inspector"
 	"github.com/yqsy/recipes/dht/metadata"
 	"strconv"
@@ -16,10 +15,6 @@ import (
 )
 
 var log = logging.MustGetLogger("dht")
-
-const (
-	TokenLen = 2
-)
 
 type HashInfoGetter struct {
 	dhtNodes []string
@@ -40,9 +35,6 @@ type HashInfoGetter struct {
 	// res prototype pool
 	// one req match unique res
 	resPrototypeDict map[string]interface{}
-
-	// req prototype pool
-	reqPrototypeDict map[string]interface{}
 
 	// for join unique check
 	uniqueNodePool map[string]struct{}
@@ -70,7 +62,6 @@ func NewHashInfoGetter(ins *inspector.Inspector) *HashInfoGetter {
 	hg.selfId = helpful.RandomString(20)
 	hg.localAddr = ":6881"
 	hg.resPrototypeDict = make(map[string]interface{})
-	hg.reqPrototypeDict = make(map[string]interface{})
 	hg.uniqueNodePool = make(map[string]struct{})
 	hg.MetaSourceChan = make(chan *metadata.MetaSource, 1024)
 	hg.Ins = ins
@@ -141,27 +132,33 @@ func (hg *HashInfoGetter) ProducingUdpMsg(consumOkChan chan struct{}, recvUdpMsg
 }
 
 func (hg *HashInfoGetter) DispatchReqAndRes(buf []byte, remoteAddr *net.UDPAddr) {
-	protoSimple := &hashinfocommon.ProtoSimple{}
-	if err := bencode.DecodeBytes(buf, protoSimple); err != nil {
-		log.Warningf("decode error from: %v", remoteAddr)
+	if b, err := bencode.Decode(string(buf)); err != nil {
+		log.Warningf("decode err: %v from: %v", err, remoteAddr)
 	} else {
-		if protoSimple.Y == "q" {
-			hg.DispatchReq(buf, protoSimple.Q, remoteAddr)
-		} else if protoSimple.Y == "r" {
-			hg.DispatchRes(buf, protoSimple.T)
-		} else if protoSimple.Y == "e" {
-			hg.DispatchError(buf, protoSimple.T)
-		} else {
-			log.Warningf("error \"y\": %v from: %v", protoSimple.Y, remoteAddr)
+		obj, err := hashinfocommon.GetObjWithCheck(b)
+		if err != nil {
+			log.Warningf("err msg: %v from: %v", err, remoteAddr)
+			return
+		}
+
+		switch obj["y"].(string) {
+		case "q":
+			hg.DispatchReq(obj, remoteAddr)
+		case "r":
+			hg.DispatchRes(obj)
+		case "e":
+			hg.DispatchError(obj)
+		default:
+			log.Warningf("error \"y\": %v from: %v", obj["y"].(string), remoteAddr)
 		}
 	}
 }
 
-func (hg *HashInfoGetter) SendReq(reqBytes []byte, remoteAddr *net.UDPAddr, tid string, resType interface{}) error {
+func (hg *HashInfoGetter) SendReq(reqBytes []byte, remoteAddr *net.UDPAddr, tid string, resType string) error {
 	if _, err := hg.serverConn.WriteToUDP(reqBytes, remoteAddr); err != nil {
 		return err
 	} else {
-		hg.resPrototypeDict[tid] = reflect.TypeOf(resType)
+		hg.resPrototypeDict[tid] = resType
 		hg.Ins.SafeDo(func() {
 			hg.Ins.UnReplyTid[tid] = struct{}{}
 		})
@@ -180,177 +177,178 @@ func (hg *HashInfoGetter) SendJoin() error {
 
 func (hg *HashInfoGetter) SendFindNode(nodeAddr string, selfId, targetId string) error {
 	tid := hg.tm.FetchAndAdd()
-	//reqFindNode := &hashinfocommon.ReqFindNode{T: tid, Y: "q", Q: "find_node",
-	//	A: hashinfocommon.AFindNode{Id: selfId, Target: targetId}}
 
-	//reqFindNode := bencode.Value{Kind: bencode.Object,
+	reqFindNodes := map[string]interface{}{
+		"t": tid,
+		"y": "q",
+		"q": "find_node",
+		"a": map[string]interface{}{
+			"id":     selfId,
+			"target": targetId,
+		},
+	}
 
+	reqBytes := []byte(bencode.Encode(reqFindNodes))
 
-	if reqBytes, err := bencode.EncodeBytes(reqFindNode); err != nil {
+	if nodeAddr, err := net.ResolveUDPAddr("udp", nodeAddr); err != nil {
 		return err
 	} else {
-		if nodeAddr, err := net.ResolveUDPAddr("udp", nodeAddr); err != nil {
+		if err = hg.SendReq(reqBytes, nodeAddr, tid, "find_node"); err != nil {
 			return err
-		} else {
-			if err = hg.SendReq(reqBytes, nodeAddr, tid, (*hashinfocommon.ResFindNode)(nil)); err != nil {
-				return err
-			}
-			hg.Ins.SafeDo(func() {
-				hg.Ins.SendedFindNodeNumber += 1
-			})
 		}
+		hg.Ins.SafeDo(func() {
+			hg.Ins.SendedFindNodeNumber += 1
+		})
 	}
+
 	return nil
 }
 
-func (hg *HashInfoGetter) DispatchReq(buf []byte, q string, remoteAddr *net.UDPAddr) {
-	// dispatch by dict key "q"
-
-	if prototype, ok := hg.reqPrototypeDict[q]; ok {
-
-		req := reflect.New(prototype.(reflect.Type).Elem()).Interface()
-
-		if err := bencode.DecodeBytes(buf, req); err != nil {
-			log.Warningf("decode req err: %v", err)
-		} else {
-			switch req.(type) {
-			case *hashinfocommon.ReqPing:
-				hg.Ins.SafeDo(func() {
-					hg.Ins.ReceivedPingNumber += 1
-				})
-				hg.HandleReqPing(req.(*hashinfocommon.ReqPing), remoteAddr)
-
-			case *hashinfocommon.ReqFindNode:
-				hg.Ins.SafeDo(func() {
-					hg.Ins.ReceivedFindNodeNumber += 1
-				})
-				hg.HandleReqFindNode(req.(*hashinfocommon.ReqFindNode), remoteAddr)
-
-			case *hashinfocommon.ReqGetPeers:
-				hg.Ins.SafeDo(func() {
-					hg.Ins.ReceivedGetPeersNumber += 1
-				})
-				hg.HandleReqGetPeers(req.(*hashinfocommon.ReqGetPeers), remoteAddr)
-
-			case *hashinfocommon.ReqAnnouncePeer:
-				hg.Ins.SafeDo(func() {
-					hg.Ins.ReceivedGetAnnouncePeerNumber += 1
-				})
-				hg.HandleReqAnnouncePeer(req.(*hashinfocommon.ReqAnnouncePeer), remoteAddr)
-
-			default:
-				panic("no way")
-			}
-		}
-	} else {
-		log.Warningf("can't not find prototype %v", q)
+func (hg *HashInfoGetter) DispatchReq(req map[string]interface{}, remoteAddr *net.UDPAddr) {
+	switch req["q"].(string) {
+	case "ping":
+		hg.Ins.SafeDo(func() {
+			hg.Ins.ReceivedPingNumber += 1
+		})
+		hg.HandleReqPing(req, remoteAddr)
+	case "find_node":
+		hg.Ins.SafeDo(func() {
+			hg.Ins.ReceivedFindNodeNumber += 1
+		})
+		hg.HandleReqFindNode(req, remoteAddr)
+	case "get_peers":
+		hg.Ins.SafeDo(func() {
+			hg.Ins.ReceivedGetPeersNumber += 1
+		})
+		hg.HandleReqGetPeers(req, remoteAddr)
+	case "announce_peer":
+		hg.Ins.SafeDo(func() {
+			hg.Ins.ReceivedGetAnnouncePeerNumber += 1
+		})
+		hg.HandleReqAnnouncePeer(req, remoteAddr)
+	default:
+		log.Warningf("unknown req type: %v", req["q"].(string))
 	}
 }
 
-func (hg *HashInfoGetter) HandleReqPing(reqPing *hashinfocommon.ReqPing, remoteAddr *net.UDPAddr) {
-	resPing := &hashinfocommon.ResPing{T: reqPing.T, Y: "r",
-		R: hashinfocommon.RPing{Id: reqPing.A.Id}}
-
-	if resBytes, err := bencode.EncodeBytes(resPing); err != nil {
-		log.Warningf("encode res err: %v", err)
+func (hg *HashInfoGetter) HandleReqPing(req map[string]interface{}, remoteAddr *net.UDPAddr) {
+	if err := hashinfocommon.CheckReqPingValid(req); err != nil {
+		log.Warningf("not valid ReqPing err: %v", err)
 	} else {
+		resPing := map[string]interface{}{
+			"t": req["t"].(string),
+			"y": "r",
+			"r": map[string]interface{}{
+				"id": req["a"].(map[string]interface{})["id"].(string),
+			},
+		}
+
+		resBytes := []byte(bencode.Encode(resPing))
 		if _, err = hg.serverConn.WriteToUDP(resBytes, remoteAddr); err != nil {
 			log.Warningf("write udp err: %v", err)
 		}
 	}
 }
 
-func (hg *HashInfoGetter) HandleReqFindNode(reqFineNode *hashinfocommon.ReqFindNode, remoteAddr *net.UDPAddr) {
-	resFindNode := &hashinfocommon.ResFindNode{T: reqFineNode.T, Y: "r",
-		R: hashinfocommon.RFindNode{Id: hg.selfId, Nodes: ""}}
-
-	if resBytes, err := bencode.EncodeBytes(resFindNode); err != nil {
-		log.Warningf("encode res err: %v", err)
-	} else {
-		if _, err = hg.serverConn.WriteToUDP(resBytes, remoteAddr); err != nil {
-			log.Warningf("write udp err: %v", err)
-		}
+func (hg *HashInfoGetter) HandleReqFindNode(req map[string]interface{}, remoteAddr *net.UDPAddr) {
+	resFindNode := map[string]interface{}{
+		"t": req["t"].(string),
+		"y": "r",
+		"r": map[string]interface{}{
+			"id":    hg.selfId,
+			"nodes": "",
+		},
 	}
+
+	resBytes := []byte(bencode.Encode(resFindNode))
+	if _, err := hg.serverConn.WriteToUDP(resBytes, remoteAddr); err != nil {
+		log.Warningf("write udp err: %v", err)
+	}
+
 }
 
-func (hg *HashInfoGetter) HandleReqGetPeers(reqGetPeers *hashinfocommon.ReqGetPeers, remoteAddr *net.UDPAddr) {
+func (hg *HashInfoGetter) HandleReqGetPeers(req map[string]interface{}, remoteAddr *net.UDPAddr) {
 	// TODO what is self id?
 	// TODO what is token?
 
-	var token string
-	if len(reqGetPeers.A.InfoHash) >= TokenLen {
-		token = reqGetPeers.A.InfoHash[:TokenLen]
-	}
-
-	resGetPeers := &hashinfocommon.ResGetPeers{T: reqGetPeers.T, Y: "r",
-		R: hashinfocommon.RGetPeers{Id: hg.selfId, Token: token, Nodes: ""}}
-
-	if resBytes, err := bencode.EncodeBytes(resGetPeers); err != nil {
-		log.Warningf("encode res err: %v", err)
+	if err := hashinfocommon.CheckReqGetPeersValid(req); err != nil {
+		log.Warningf("not valid HandleReqGetPeers err: %v", err)
 	} else {
-		if _, err = hg.serverConn.WriteToUDP(resBytes, remoteAddr); err != nil {
+		token := req["a"].(map[string]interface{})["info_hash"].(string)[:hashinfocommon.TokenLen]
+
+		resGetPeers := map[string]interface{}{
+			"t": req["t"].(string),
+			"y": "r",
+			"r": map[string]interface{}{
+				"id":    hg.selfId,
+				"token": token,
+				"nodes": "",
+			},
+		}
+
+		resBytes := []byte(bencode.Encode(resGetPeers))
+		if _, err := hg.serverConn.WriteToUDP(resBytes, remoteAddr); err != nil {
 			log.Warningf("write udp err: %v", err)
 		}
 	}
 }
 
-func (hg *HashInfoGetter) HandleReqAnnouncePeer(reqAnnouncePeer *hashinfocommon.ReqAnnouncePeer, remoteAddr *net.UDPAddr) {
-	if len(reqAnnouncePeer.A.InfoHash) != 20 {
-		log.Warningf("infohash len != 20")
-		return
-	}
-
-	peerAddr := remoteAddr.IP.String() + ":" + strconv.Itoa(reqAnnouncePeer.A.Port)
-	hg.MetaSourceChan <- &metadata.MetaSource{
-		Hashinfo: reqAnnouncePeer.A.InfoHash,
-		Addr:     peerAddr}
-
-	// TODO what is self id?
-	resAnnouncePeer := &hashinfocommon.ResAnnouncePeer{T: reqAnnouncePeer.T, Y: "r",
-		R: hashinfocommon.RAnnouncePeer{Id: hg.selfId}}
-
-	if resBytes, err := bencode.EncodeBytes(resAnnouncePeer); err != nil {
-		log.Warningf("encode res err: %v", err)
+func (hg *HashInfoGetter) HandleReqAnnouncePeer(req map[string]interface{}, remoteAddr *net.UDPAddr) {
+	if err := hashinfocommon.CheckReqAnnouncePeerValid(req); err != nil {
+		log.Warningf("not valid ReqAnnouncePeer err: %v", err)
 	} else {
-		if _, err = hg.serverConn.WriteToUDP(resBytes, remoteAddr); err != nil {
+		a := req["a"].(map[string]interface{})
+
+		peerAddr := remoteAddr.IP.String() + ":" + strconv.Itoa(a["port"].(int))
+
+		hg.MetaSourceChan <- &metadata.MetaSource{
+			Hashinfo: a["info_hash"].(string),
+			Addr:     peerAddr}
+
+		resAnnouncePeer := map[string]interface{}{
+			"t": req["t"].(string),
+			"y": "r",
+			"r": map[string]interface{}{
+				"id": hg.selfId,
+			},
+		}
+
+		resBytes := []byte(bencode.Encode(resAnnouncePeer))
+		if _, err := hg.serverConn.WriteToUDP(resBytes, remoteAddr); err != nil {
 			log.Warningf("write udp err: %v", err)
 		}
 	}
+
 }
 
-func (hg *HashInfoGetter) DispatchRes(buf []byte, tid string) {
-	// prototype create res type and dispatch
+func (hg *HashInfoGetter) DispatchRes(res map[string]interface{}) {
+	tid := res["t"].(string)
 	if prototype, ok := hg.resPrototypeDict[tid]; ok {
 		delete(hg.resPrototypeDict, tid)
 		hg.Ins.SafeDo(func() {
 			delete(hg.Ins.UnReplyTid, tid)
 		})
 
-		res := reflect.New(prototype.(reflect.Type).Elem()).Interface()
-		if err := bencode.DecodeBytes(buf, res); err != nil {
-			log.Warningf("can't not decode tid: %v err: %v", helpful.Get10Hex(tid), err)
-		} else {
-			switch res.(type) {
-			case *hashinfocommon.ResFindNode:
-				hg.HandleResFindNode(res.(*hashinfocommon.ResFindNode))
-			default:
-				panic("no way")
-			}
+		switch prototype {
+		case "find_node":
+			hg.HandleResFindNode(res)
+		default:
+			panic("impossible")
 		}
+
 	} else {
 		//log.Warningf("not match res received tid: %v,drop it", helpful.Get10Hex(tid))
 	}
 }
 
-func (hg *HashInfoGetter) HandleResFindNode(resFindNode *hashinfocommon.ResFindNode) {
-	if err := resFindNode.CheckValid(); err != nil {
+func (hg *HashInfoGetter) HandleResFindNode(res map[string]interface{}) {
+	if err := hashinfocommon.CheckResFindNodeValid(res); err != nil {
 		log.Warningf("not valid ResFindNode err: %v", err)
 	} else {
-		nodes := resFindNode.GetNodes()
-		//log.Infof("get %v nodes", len(nodes))
+		r := res["r"].(map[string]interface{})
+		nodes := hashinfocommon.GetNodes(r["nodes"].(string))
 		for _, node := range nodes {
 			if _, ok := hg.uniqueNodePool[node.Id]; ok {
-				//log.Warningf("node repeat id: %v", helpful.GetHex(node.Id))
 				continue
 			}
 			hg.uniqueNodePool[node.Id] = struct{}{}
@@ -364,14 +362,17 @@ func (hg *HashInfoGetter) HandleResFindNode(resFindNode *hashinfocommon.ResFindN
 	}
 }
 
-func (hg *HashInfoGetter) DispatchError(buf []byte, tid string) {
+func (hg *HashInfoGetter) DispatchError(err map[string]interface{}) {
+	tid := err["t"].(string)
 	if _, ok := hg.resPrototypeDict[tid]; ok {
 		delete(hg.resPrototypeDict, tid)
 
 		hg.Ins.SafeDo(func() {
 			hg.Ins.ReceivedErrors += 1
 		})
-
+		code := err["e"].([]interface{})[0].(int)
+		description := err["e"].([]interface{})[1].(string)
+		log.Warningf("received a err: %v %v , tid: %v", code, description, tid)
 	} else {
 		log.Warningf("received a tid not match res, tid: %v", tid)
 	}
