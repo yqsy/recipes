@@ -298,10 +298,20 @@ func (hg *HashInfoGetter) HandleReqAnnouncePeer(req map[string]interface{}, remo
 	} else {
 		a := req["a"].(map[string]interface{})
 
-		peerAddr := remoteAddr.IP.String() + ":" + strconv.Itoa(a["port"].(int))
+		// If it is present and non-zero, the port argument should be ignored and the source port of
+		// the UDP packet should be used as the peer's port instead.
+		port := strconv.Itoa(a["port"].(int))
+
+		if impliedPort, ok := a["implied_port"]; ok {
+			if impliedPort, ok := impliedPort.(int); ok && impliedPort != 0 {
+				port = strconv.Itoa(remoteAddr.Port)
+			}
+		}
+
+		peerAddr := remoteAddr.IP.String() + ":" + port
 
 		hg.MetaSourceChan <- &metadata.MetaSource{
-			Hashinfo: a["info_hash"].(string),
+			Infohash: a["info_hash"].(string),
 			Addr:     peerAddr}
 
 		resAnnouncePeer := map[string]interface{}{

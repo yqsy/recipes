@@ -170,3 +170,20 @@ func CheckExtHandShakeRes(b interface{}) error {
 
 	return nil
 }
+
+func CheckPieceRes(b interface{}) error {
+	if obj, ok := b.(map[string]interface{}); !ok {
+		return errors.New("not an obj")
+	} else {
+		if msgType, ok := obj["msg_type"]; !ok ||
+			reflect.TypeOf(msgType).Kind() != reflect.Int {
+			return errors.New("msg_type error")
+		}
+
+		if piece, ok := obj["piece"]; !ok ||
+			reflect.TypeOf(piece).Kind() != reflect.Int {
+			return errors.New("piece error")
+		}
+	}
+	return nil
+}

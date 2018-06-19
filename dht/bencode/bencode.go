@@ -79,6 +79,13 @@ func Decode(b string) (interface{}, error) {
 	return ctx.ParseValue()
 }
 
+// return obj,remain string,error
+func DecodeAndLeak(b string) (interface{}, string, error) {
+	ctx := Context{b: b}
+	v, err := ctx.ParseValue()
+	return v, ctx.b, err
+}
+
 type Context struct {
 	b string
 }

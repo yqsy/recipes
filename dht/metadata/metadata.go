@@ -9,9 +9,9 @@ import (
 	"errors"
 	"github.com/yqsy/recipes/dht/metadatacommon"
 	"github.com/op/go-logging"
-	"time"
-	"fmt"
 	"github.com/yqsy/recipes/dht/bencode"
+	"time"
+	"crypto/sha1"
 )
 
 var log = logging.MustGetLogger("dht")
@@ -29,7 +29,7 @@ var handshakePrefix = []byte{
 }
 
 type MetaSource struct {
-	Hashinfo string
+	Infohash string
 	Addr     string
 }
 
@@ -42,7 +42,7 @@ func (mg *MetaGetter) HandleShake(conn net.Conn, metaSource *MetaSource) error {
 	var sendBuf bytes.Buffer
 	sendBuf.Write(handshakePrefix) // 28
 	// SHA1 Hash of info dictionary: 3dec76b035c3beef644bcb8eaca88406527fa422
-	sendBuf.Write([]byte(metaSource.Hashinfo)) // 20
+	sendBuf.Write([]byte(metaSource.Infohash)) // 20
 	// Peer ID: bd15803eb26ad29bee2ba9c2b258bcf3d2abf6b1
 	sendBuf.Write([]byte(helpful.RandomString(20)))
 
@@ -109,74 +109,94 @@ func (mg *MetaGetter) ExtHandleShake(conn net.Conn, metaSource *MetaSource) (map
 	}
 }
 
-// http://www.bittorrent.org/beps/bep_0003.html
-func (mg *MetaGetter) GetBitField(conn net.Conn) ([]byte /*payload bitmap*/ , error) {
-	resPacket, err := metadatacommon.ReadAPacket(conn)
-
-	if err != nil {
-		return []byte{}, err
-	}
-
-	if resPacket.BitMsgId != 5 {
-		return []byte{}, errors.New("message type is not 5")
-	}
-
-	return resPacket.Payload, err
-}
-
-// http://www.bittorrent.org/beps/bep_0009.html
-func (mg *MetaGetter) GetPieces(conn net.Conn, extHandshakeRes map[string]interface{}) error {
-	utMetadata := extHandshakeRes["m"].(map[string]interface{})["ut_metadata"].(int)
-	metadataSize := extHandshakeRes["metadata_size"].(int)
-
-	piecesNum := metadataSize / BLOCK
-	if metadataSize%BLOCK != 0 {
-		piecesNum++
-	}
-
+// write all pieces request
+func (mg *MetaGetter) WritePiecesReq(conn net.Conn, piecesNum, utMetadata int) error {
 	for i := 0; i < piecesNum; i++ {
-		requset := map[string]interface{}{
+		req := map[string]interface{}{
 			"msg_type": metadatacommon.Request,
 			"piece":    i,
 		}
 
-		reqBytes := []byte(bencode.Encode(requset))
+		reqBytes := []byte(bencode.Encode(req))
 
 		if err := metadatacommon.WriteAExtPacket(conn, metadatacommon.Extended, byte(utMetadata), reqBytes); err != nil {
 			return err
-		} else {
-
-			for {
-				resPacket, err := metadatacommon.ReadAExtPacket(conn)
-
-				if err != nil {
-					return nil
-				}
-
-				_ = resPacket
-
-			}
 		}
 	}
 	return nil
 }
 
-// 这个只是我的猜测
-func (mg *MetaGetter) DmdDiscard(conn net.Conn) error {
+func (mg *MetaGetter) ReadPiecesRes(conn net.Conn, piecesNum int, metadataSize int) ([][]byte, error) {
+	// get all pieces response
+	pieces := make([][]byte, piecesNum)
+	for i := 0; i < len(pieces); i++ {
+		if resPacket, err := metadatacommon.ReadAExtPacket(conn); err != nil {
+			return nil, err
+		} else {
+			if resPacket.BitMsgId != metadatacommon.Extended ||
+				resPacket.ExtMsgId != metadatacommon.Data {
+			} else {
+				if res, remain, err := bencode.DecodeAndLeak(string(resPacket.Payload)); err != nil {
+					return nil, err
+				} else {
+					if err = metadatacommon.CheckPieceRes(res); err != nil {
+						return nil, err
+					}
+					if res.(map[string]interface{})["msg_type"].(int) != metadatacommon.Data {
+						return nil, errors.New("msg_type != Data")
+					}
+					pieceIdx := res.(map[string]interface{})["piece"].(int)
+					if pieceIdx > len(pieces) {
+						return nil, errors.New("piece out of range")
+					}
 
-	for {
-		resPacket, err := metadatacommon.ReadAPacket(conn)
+					// the last piece
+					if pieceIdx == piecesNum-1 && len(remain) != metadataSize/BLOCK {
+						return nil, errors.New("last piece error")
+					} else if len(remain) != BLOCK {
+						return nil, errors.New("piece error")
+					}
+					pieces[pieceIdx] = []byte(remain)
+				}
+			}
+		}
+	}
 
-		if err != nil {
-			return err
+	for i := 0; i < len(pieces); i++ {
+		if len(pieces[i]) == 0 {
+			return nil, errors.New("pieces not complete")
+		}
+	}
+
+	return pieces, nil
+}
+
+// http://www.bittorrent.org/beps/bep_0009.html
+func (mg *MetaGetter) GetMetadata(conn net.Conn, extHandshakeRes map[string]interface{}, infoHash string) (interface{}, error) {
+	utMetadata := extHandshakeRes["m"].(map[string]interface{})["ut_metadata"].(int)
+	metadataSize := extHandshakeRes["metadata_size"].(int)
+	piecesNum := metadataSize / BLOCK
+	if metadataSize%BLOCK != 0 {
+		piecesNum++
+	}
+
+	if err := mg.WritePiecesReq(conn, piecesNum, utMetadata); err != nil {
+		return nil, err
+	}
+
+	if pieces, err := mg.ReadPiecesRes(conn, piecesNum, metadataSize); err != nil {
+		return nil, err
+	} else {
+		metaDataInfo := bytes.Join(pieces, nil)
+
+		if !bytes.Equal([]byte(infoHash), sha1.Sum(metaDataInfo)[:]) {
+			return nil, errors.New("sha1 not equal")
 		}
 
-		if resPacket.BitMsgId == 4 {
-			// nice
-		} else if resPacket.BitMsgId == 9 {
-			return nil
+		if v, err := bencode.Decode(string(metaDataInfo)); err != nil {
+			return nil, errors.New("decode metaDataInfo error")
 		} else {
-			return errors.New(fmt.Sprintf("error msg id = %v", resPacket.BitMsgId))
+			return v, nil
 		}
 	}
 }
@@ -184,37 +204,26 @@ func (mg *MetaGetter) DmdDiscard(conn net.Conn) error {
 func (mg *MetaGetter) Serve(conn net.Conn, metaSource *MetaSource) {
 	defer conn.Close()
 
+	log.Infof("infohash: %v remote: %v", helpful.GetHex(metaSource.Infohash), metaSource.Addr)
+
 	if err := mg.HandleShake(conn, metaSource); err != nil {
-		log.Warningf("handshake err: %v remoteaddr: %v", err, conn.RemoteAddr())
+		log.Warningf("handshake err: %v remoteAddr: %v", err, conn.RemoteAddr())
 		return
 	}
 
+	// get utMetadata and metadataSize
 	extHandshakeRes, err := mg.ExtHandleShake(conn, metaSource)
 	if err != nil {
-		log.Warningf("extHandleShake err: %v remoteaddr: %v", err, conn.RemoteAddr())
+		log.Warningf("extHandleShake err: %v remoteAddr: %v", err, conn.RemoteAddr())
 		return
 	}
 
-	//  discard Message Type: Bitfield (5)
-	_, err = mg.GetBitField(conn)
+	metaData, err := mg.GetMetadata(conn, extHandshakeRes, metaSource.Infohash)
 	if err != nil {
-		log.Warningf("get bitfield err: %v remoteaddr: %v", err, conn.RemoteAddr())
+		log.Warningf("GetMetadata err: %v remoteAddr: %v", err, conn.RemoteAddr())
 		return
 	}
-
-	// discard Message Type: Have (4) / Message Type: Port (9)
-	if err = mg.DmdDiscard(conn); err != nil {
-		log.Warningf("dmddiscard err: %v remoteaddr: %v", err, conn.RemoteAddr())
-		return
-	}
-
-	err = mg.GetPieces(conn, extHandshakeRes)
-	if err != nil {
-		log.Warningf("GetPieces err: %v remoteaddr: %v", err, conn.RemoteAddr())
-		return
-	}
-
-	log.Infof("ok????")
+	
 }
 
 func (mg *MetaGetter) Run(metaSourceChan chan *MetaSource) error {
@@ -225,6 +234,7 @@ func (mg *MetaGetter) Run(metaSourceChan chan *MetaSource) error {
 		if conn, err := net.DialTimeout("tcp", metaSource.Addr, time.Second*15); err != nil {
 			log.Warningf("connect %v err", metaSource.Addr)
 		} else {
+
 			go mg.Serve(conn, metaSource)
 		}
 	}
