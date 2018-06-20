@@ -224,7 +224,6 @@ func (mg *MetaGetter) Serve(conn net.Conn, metaSource *MetaSource) {
 	}
 
 	log.Infof(bencode.Prettify(metaData))
-
 }
 
 func (mg *MetaGetter) Run(metaSourceChan chan *MetaSource) error {

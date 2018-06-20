@@ -61,10 +61,13 @@ func GetObjWithCheck(b interface{}) (map[string]interface{}, error) {
 
 			// response
 			if y == "r" {
-
 				// response parameter
 				if r, ok := obj["r"]; !ok || reflect.TypeOf(r).Kind() != reflect.Map {
 					return nil, errors.New("error key \"r\"")
+				} else {
+					if id, ok := r.(map[string]interface{})["id"]; !ok || reflect.TypeOf(id).Kind() != reflect.String || len(id.(string)) != 20 {
+						return nil, errors.New("error id \"r\"")
+					}
 				}
 			}
 
@@ -90,10 +93,6 @@ func GetObjWithCheck(b interface{}) (map[string]interface{}, error) {
 
 func CheckResFindNodeValid(res map[string]interface{}) error {
 	r := res["r"].(map[string]interface{})
-
-	if err := CheckDictIdValid(r); err != nil {
-		return err
-	}
 
 	if nodes, ok := r["nodes"]; !ok ||
 		reflect.TypeOf(nodes).Kind() != reflect.String ||

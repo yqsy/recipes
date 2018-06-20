@@ -9,21 +9,23 @@ import (
 	"github.com/yqsy/recipes/dht/metadata"
 	"strconv"
 	"github.com/op/go-logging"
-	"github.com/yqsy/recipes/dht/flowcontrol"
 	"time"
 	"github.com/yqsy/recipes/dht/bencode"
 )
 
 var log = logging.MustGetLogger("dht")
 
+type Req struct {
+	q map[string]interface{}
+
+	targetId string
+}
+
 type HashInfoGetter struct {
 	dhtNodes []string
-
-	// randmon 20 bytes id
-	selfId string
-
+	// random 20 bytes id
+	selfId    string
 	localAddr string
-
 	// send req, get res
 	// or get req, reply res
 	// all use this udp conn
@@ -31,10 +33,10 @@ type HashInfoGetter struct {
 
 	// gen id
 	tm transaction.Transaction
-
-	// res prototype pool
 	// one req match unique res
-	resPrototypeDict map[string]interface{}
+	transactionDict map[string]Req
+	// req transaction id delete (execute in main event loop)
+	TransactionChan chan func()
 
 	// for join unique check
 	uniqueNodePool map[string]struct{}
@@ -42,10 +44,8 @@ type HashInfoGetter struct {
 	// output
 	MetaSourceChan chan *metadata.MetaSource
 
-	// for monitor
+	// monitor
 	Ins *inspector.Inspector
-
-	FlowControl *flowcontrol.FlowControl
 }
 
 type UdpMsg struct {
@@ -61,11 +61,11 @@ func NewHashInfoGetter(ins *inspector.Inspector) *HashInfoGetter {
 		"dht.transmissionbt.com:6881"}
 	hg.selfId = helpful.RandomString(20)
 	hg.localAddr = ":6881"
-	hg.resPrototypeDict = make(map[string]interface{})
+	hg.transactionDict = make(map[string]Req)
+	hg.TransactionChan = make(chan func())
 	hg.uniqueNodePool = make(map[string]struct{})
 	hg.MetaSourceChan = make(chan *metadata.MetaSource, 1024)
 	hg.Ins = ins
-	hg.FlowControl = flowcontrol.NewFlowControl()
 
 	hg.Ins.SafeDo(func() {
 		hg.Ins.BasicNodes = hg.dhtNodes
@@ -89,10 +89,6 @@ func (hg *HashInfoGetter) Run() error {
 		}
 	}
 
-	go func() {
-		hg.FlowControl.Increasing(512)
-	}()
-
 	produceUdpMsgChan := make(chan *UdpMsg)
 	consumeOkChan := make(chan struct{})
 
@@ -100,7 +96,7 @@ func (hg *HashInfoGetter) Run() error {
 		hg.ProducingUdpMsg(consumeOkChan, produceUdpMsgChan)
 	}()
 
-	rejoinTicker := time.NewTicker(time.Second * 5)
+	checkTicker := time.NewTicker(time.Second * 5)
 
 	consumeOkChan <- struct{}{} // start
 	for {
@@ -108,10 +104,19 @@ func (hg *HashInfoGetter) Run() error {
 		case udpMsg := <-produceUdpMsgChan:
 			hg.DispatchReqAndRes(udpMsg.Packet, udpMsg.RemoteAddr)
 			consumeOkChan <- struct{}{} // cousume this msg ok. begin to receive next one
-		case <-rejoinTicker.C:
-			if err := hg.SendJoin(); err != nil {
-				log.Warningf("send join err: %v", err)
-			}
+
+		case safeDelTid := <-hg.TransactionChan:
+			safeDelTid()
+
+		case <-checkTicker.C:
+
+			// TODO
+			// 1. routing表格没有数据项时, 发送sendjoin
+			// 2. 没有请求一对一的事务表格项时对,对routing表格所有项发送find_node
+
+			//if err := hg.SendJoin(); err != nil {
+			//	log.Warningf("send join err: %v", err)
+			//}
 		}
 	}
 }
@@ -154,11 +159,25 @@ func (hg *HashInfoGetter) DispatchReqAndRes(buf []byte, remoteAddr *net.UDPAddr)
 	}
 }
 
-func (hg *HashInfoGetter) SendReq(reqBytes []byte, remoteAddr *net.UDPAddr, tid string, resType string) error {
+func (hg *HashInfoGetter) SendReq(req map[string]interface{}, remoteAddr *net.UDPAddr, targetId, tid string) error {
+	reqBytes := []byte(bencode.Encode(req))
+
 	if _, err := hg.serverConn.WriteToUDP(reqBytes, remoteAddr); err != nil {
 		return err
 	} else {
-		hg.resPrototypeDict[tid] = resType
+		hg.transactionDict[tid] = Req{q: req, targetId: targetId}
+
+		// safe delete in main event loop
+		go func() {
+			<-time.After(time.Second * 15)
+			hg.TransactionChan <- func() {
+				if _, ok := hg.transactionDict[tid]; ok {
+					delete(hg.transactionDict, tid)
+					log.Warningf("tid: %v timeout", tid)
+				}
+			}
+		}()
+
 		hg.Ins.SafeDo(func() {
 			hg.Ins.UnReplyTid[tid] = struct{}{}
 		})
@@ -188,12 +207,10 @@ func (hg *HashInfoGetter) SendFindNode(nodeAddr string, selfId, targetId string)
 		},
 	}
 
-	reqBytes := []byte(bencode.Encode(reqFindNodes))
-
 	if nodeAddr, err := net.ResolveUDPAddr("udp", nodeAddr); err != nil {
 		return err
 	} else {
-		if err = hg.SendReq(reqBytes, nodeAddr, tid, "find_node"); err != nil {
+		if err = hg.SendReq(reqFindNodes, nodeAddr, targetId, tid); err != nil {
 			return err
 		}
 		hg.Ins.SafeDo(func() {
@@ -227,7 +244,7 @@ func (hg *HashInfoGetter) DispatchReq(req map[string]interface{}, remoteAddr *ne
 		})
 		hg.HandleReqAnnouncePeer(req, remoteAddr)
 	default:
-		//log.Warningf("unknown req type: %v", req["q"].(string))
+		//log.Warningf("unknown req type: %v", q["q"].(string))
 	}
 }
 
@@ -332,15 +349,23 @@ func (hg *HashInfoGetter) HandleReqAnnouncePeer(req map[string]interface{}, remo
 
 func (hg *HashInfoGetter) DispatchRes(res map[string]interface{}) {
 	tid := res["t"].(string)
-	if prototype, ok := hg.resPrototypeDict[tid]; ok {
-		delete(hg.resPrototypeDict, tid)
+	if req, ok := hg.transactionDict[tid]; ok {
+		delete(hg.transactionDict, tid)
 		hg.Ins.SafeDo(func() {
 			delete(hg.Ins.UnReplyTid, tid)
 		})
 
-		switch prototype {
+		// check send target's id and response's selfId
+		if req.targetId != res["r"].(map[string]interface{})["id"].(string) {
+			log.Warningf("req.a.target = %v, res.r.id = %v, do not equal",
+				helpful.GetHex(req.targetId),
+				helpful.GetHex(res["r"].(map[string]interface{})["id"].(string)))
+			return
+		}
+
+		switch req.q["q"].(string) {
 		case "find_node":
-			hg.HandleResFindNode(res)
+			hg.HandleResFindNode(res, req.q)
 		default:
 			panic("impossible")
 		}
@@ -350,7 +375,7 @@ func (hg *HashInfoGetter) DispatchRes(res map[string]interface{}) {
 	}
 }
 
-func (hg *HashInfoGetter) HandleResFindNode(res map[string]interface{}) {
+func (hg *HashInfoGetter) HandleResFindNode(res map[string]interface{}, req map[string]interface{}) {
 	if err := hashinfocommon.CheckResFindNodeValid(res); err != nil {
 		//log.Warningf("not valid ResFindNode err: %v", err)
 	} else {
@@ -362,19 +387,16 @@ func (hg *HashInfoGetter) HandleResFindNode(res map[string]interface{}) {
 			}
 			hg.uniqueNodePool[node.Id] = struct{}{}
 
-			hg.FlowControl.WaitFlow()
 
-			if err := hg.SendFindNode(node.Addr, node.Id[15:]+hg.selfId[:15], node.Id); err != nil {
-				log.Warningf("send find_node err: %v", err)
-			}
+
 		}
 	}
 }
 
 func (hg *HashInfoGetter) DispatchError(err map[string]interface{}) {
 	tid := err["t"].(string)
-	if _, ok := hg.resPrototypeDict[tid]; ok {
-		delete(hg.resPrototypeDict, tid)
+	if _, ok := hg.transactionDict[tid]; ok {
+		delete(hg.transactionDict, tid)
 
 		hg.Ins.SafeDo(func() {
 			hg.Ins.ReceivedErrors += 1

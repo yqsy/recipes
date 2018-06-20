@@ -8,9 +8,11 @@ type Transaction struct {
 	Id uint64
 }
 
-// int2bytes returns the byte array it represents.
+// BigEndian
 func int2bytes(val uint64) []byte {
-	data, j := make([]byte, 8), -1
+	data := make([]byte, 8)
+	j := -1
+
 	for i := 0; i < 8; i++ {
 		shift := uint64((7 - i) * 8)
 		data[i] = byte((val & (0xff << shift)) >> shift)
@@ -20,10 +22,13 @@ func int2bytes(val uint64) []byte {
 		}
 	}
 
-	if j != -1 {
+	if j == -1 {
+		// if val is zero
+		return data[:1]
+	} else {
+		// remove all zero at bigendian side
 		return data[j:]
 	}
-	return data[:1]
 }
 
 // 他的协议看似是字符串,其实[]byte,保存的一个一个字节
