@@ -95,7 +95,7 @@ dht爬虫思路:
 
 语言|join|衍生|事务id
 -|-|-|-
-go|id:自身 target:自身|id:自身 target:自身+衍生地址混合|全局递增的id取2字节
+go|id:自身 target:自身|id:衍生地址+自身混合 target:衍生地址|全局递增的id取2字节
 python|id:自身 target:随机|id:衍生地址+自身混合 target:随机|随机2字节
 
 

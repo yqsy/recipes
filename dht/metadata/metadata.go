@@ -129,7 +129,7 @@ func (mg *MetaGetter) WritePiecesReq(conn net.Conn, piecesNum, utMetadata int) e
 func (mg *MetaGetter) ReadPiecesRes(conn net.Conn, piecesNum int, metadataSize int) ([][]byte, error) {
 	// get all pieces response
 	pieces := make([][]byte, piecesNum)
-	for i := 0; i < len(pieces); i++ {
+	for i := 0; i < len(pieces); {
 		if resPacket, err := metadatacommon.ReadAExtPacket(conn); err != nil {
 			return nil, err
 		} else {
@@ -157,6 +157,7 @@ func (mg *MetaGetter) ReadPiecesRes(conn net.Conn, piecesNum int, metadataSize i
 						return nil, errors.New("piece error")
 					}
 					pieces[pieceIdx] = []byte(remain)
+					i++
 				}
 			}
 		}
@@ -188,8 +189,8 @@ func (mg *MetaGetter) GetMetadata(conn net.Conn, extHandshakeRes map[string]inte
 		return nil, err
 	} else {
 		metaDataInfo := bytes.Join(pieces, nil)
-
-		if !bytes.Equal([]byte(infoHash), sha1.Sum(metaDataInfo)[:]) {
+		sha1sum := sha1.Sum(metaDataInfo)
+		if !bytes.Equal([]byte(infoHash), sha1sum[:]) {
 			return nil, errors.New("sha1 not equal")
 		}
 
@@ -203,8 +204,6 @@ func (mg *MetaGetter) GetMetadata(conn net.Conn, extHandshakeRes map[string]inte
 
 func (mg *MetaGetter) Serve(conn net.Conn, metaSource *MetaSource) {
 	defer conn.Close()
-
-	log.Infof("infohash: %v remote: %v", helpful.GetHex(metaSource.Infohash), metaSource.Addr)
 
 	if err := mg.HandleShake(conn, metaSource); err != nil {
 		log.Warningf("handshake err: %v remoteAddr: %v", err, conn.RemoteAddr())
@@ -223,13 +222,17 @@ func (mg *MetaGetter) Serve(conn net.Conn, metaSource *MetaSource) {
 		log.Warningf("GetMetadata err: %v remoteAddr: %v", err, conn.RemoteAddr())
 		return
 	}
-	
+
+	log.Infof(bencode.Prettify(metaData))
+
 }
 
 func (mg *MetaGetter) Run(metaSourceChan chan *MetaSource) error {
 
 	for {
 		metaSource := <-metaSourceChan
+
+		log.Infof("infohash: %v remote: %v", helpful.GetHex(metaSource.Infohash), metaSource.Addr)
 
 		if conn, err := net.DialTimeout("tcp", metaSource.Addr, time.Second*15); err != nil {
 			log.Warningf("connect %v err", metaSource.Addr)

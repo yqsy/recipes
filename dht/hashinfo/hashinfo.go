@@ -133,11 +133,11 @@ func (hg *HashInfoGetter) ProducingUdpMsg(consumOkChan chan struct{}, produceUdp
 
 func (hg *HashInfoGetter) DispatchReqAndRes(buf []byte, remoteAddr *net.UDPAddr) {
 	if b, err := bencode.Decode(string(buf)); err != nil {
-		log.Warningf("decode err: %v from: %v", err, remoteAddr)
+		// log.Warningf("decode err: %v from: %v", err, remoteAddr)
 	} else {
 		obj, err := hashinfocommon.GetObjWithCheck(b)
 		if err != nil {
-			log.Warningf("err msg: %v from: %v", err, remoteAddr)
+			//log.Warningf("err msg: %v from: %v", err, remoteAddr)
 			return
 		}
 
@@ -227,7 +227,7 @@ func (hg *HashInfoGetter) DispatchReq(req map[string]interface{}, remoteAddr *ne
 		})
 		hg.HandleReqAnnouncePeer(req, remoteAddr)
 	default:
-		log.Warningf("unknown req type: %v", req["q"].(string))
+		//log.Warningf("unknown req type: %v", req["q"].(string))
 	}
 }
 
@@ -352,7 +352,7 @@ func (hg *HashInfoGetter) DispatchRes(res map[string]interface{}) {
 
 func (hg *HashInfoGetter) HandleResFindNode(res map[string]interface{}) {
 	if err := hashinfocommon.CheckResFindNodeValid(res); err != nil {
-		log.Warningf("not valid ResFindNode err: %v", err)
+		//log.Warningf("not valid ResFindNode err: %v", err)
 	} else {
 		r := res["r"].(map[string]interface{})
 		nodes := hashinfocommon.GetNodes(r["nodes"].(string))
@@ -364,7 +364,7 @@ func (hg *HashInfoGetter) HandleResFindNode(res map[string]interface{}) {
 
 			hg.FlowControl.WaitFlow()
 
-			if err := hg.SendFindNode(node.Addr, hg.selfId, hg.selfId[:15]+node.Id[15:]); err != nil {
+			if err := hg.SendFindNode(node.Addr, node.Id[15:]+hg.selfId[:15], node.Id); err != nil {
 				log.Warningf("send find_node err: %v", err)
 			}
 		}
@@ -381,8 +381,11 @@ func (hg *HashInfoGetter) DispatchError(err map[string]interface{}) {
 		})
 		code := err["e"].([]interface{})[0].(int)
 		description := err["e"].([]interface{})[1].(string)
-		log.Warningf("received a err: %v %v , tid: %v", code, description, helpful.Get10Hex(tid))
+
+		_ = code
+		_ = description
+		//log.Warningf("received a err: %v %v , tid: %v", code, description, helpful.Get10Hex(tid))
 	} else {
-		log.Warningf("received a tid not match res, tid: %v", helpful.Get10Hex(tid))
+		//log.Warningf("received a tid not match res, tid: %v", helpful.Get10Hex(tid))
 	}
 }

@@ -7,6 +7,14 @@ import (
 	"github.com/shiyanhui/dht"
 	"net/http"
 	_ "net/http/pprof"
+	"github.com/op/go-logging"
+	"os"
+)
+
+var log = logging.MustGetLogger("dht")
+
+var format = logging.MustStringFormatter(
+	`%{color}%{time:20060102 15:04:05.000000} %{id} %{level:.4s}%{color:reset} %{message} - %{shortfile}`,
 )
 
 type file struct {
@@ -22,6 +30,10 @@ type bitTorrent struct {
 }
 
 func main() {
+	backend := logging.NewLogBackend(os.Stderr, "", 0)
+	backendFormatter := logging.NewBackendFormatter(backend, format)
+	logging.SetBackend(backendFormatter)
+
 	go func() {
 		http.ListenAndServe(":6060", nil)
 	}()

@@ -123,7 +123,7 @@ func CheckReqAnnouncePeerValid(req map[string]interface{}) error {
 
 	if port, ok := a["port"]; !ok ||
 		reflect.TypeOf(port).Kind() != reflect.Int ||
-		port.(int) < 0 || port.(int) > 65535 {
+		port.(int) <= 0 || port.(int) > 65535 {
 		return errors.New("error a.port")
 	}
 
@@ -148,9 +148,13 @@ func GetNodes(str string) []Node {
 			str[p+2],
 			str[p+3]).String()
 		p += 4
-		port := strconv.Itoa(int(uint16(str[p])<<8 | uint16(str[p+1])))
+		port := int(uint16(str[p])<<8 | uint16(str[p+1]))
 
-		node.Addr = ip + ":" + port
+		if port <= 0 || port > 65535 {
+			continue
+		}
+
+		node.Addr = ip + ":" + strconv.Itoa(port)
 
 		nodes = append(nodes, node)
 	}
