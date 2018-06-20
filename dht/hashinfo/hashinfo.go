@@ -15,11 +15,7 @@ import (
 
 var log = logging.MustGetLogger("dht")
 
-type Req struct {
-	q map[string]interface{}
-
-	targetId string
-}
+type Req map[string]interface{}
 
 type HashInfoGetter struct {
 	dhtNodes []string
@@ -159,13 +155,13 @@ func (hg *HashInfoGetter) DispatchReqAndRes(buf []byte, remoteAddr *net.UDPAddr)
 	}
 }
 
-func (hg *HashInfoGetter) SendReq(req map[string]interface{}, remoteAddr *net.UDPAddr, targetId, tid string) error {
+func (hg *HashInfoGetter) SendReq(req map[string]interface{}, remoteAddr *net.UDPAddr, tid string) error {
 	reqBytes := []byte(bencode.Encode(req))
 
 	if _, err := hg.serverConn.WriteToUDP(reqBytes, remoteAddr); err != nil {
 		return err
 	} else {
-		hg.transactionDict[tid] = Req{q: req, targetId: targetId}
+		hg.transactionDict[tid] = req
 
 		// safe delete in main event loop
 		go func() {
@@ -210,7 +206,7 @@ func (hg *HashInfoGetter) SendFindNode(nodeAddr string, selfId, targetId string)
 	if nodeAddr, err := net.ResolveUDPAddr("udp", nodeAddr); err != nil {
 		return err
 	} else {
-		if err = hg.SendReq(reqFindNodes, nodeAddr, targetId, tid); err != nil {
+		if err = hg.SendReq(reqFindNodes, nodeAddr, tid); err != nil {
 			return err
 		}
 		hg.Ins.SafeDo(func() {
@@ -355,17 +351,9 @@ func (hg *HashInfoGetter) DispatchRes(res map[string]interface{}) {
 			delete(hg.Ins.UnReplyTid, tid)
 		})
 
-		// check send target's id and response's selfId
-		if req.targetId != res["r"].(map[string]interface{})["id"].(string) {
-			log.Warningf("req.a.target = %v, res.r.id = %v, do not equal",
-				helpful.GetHex(req.targetId),
-				helpful.GetHex(res["r"].(map[string]interface{})["id"].(string)))
-			return
-		}
-
-		switch req.q["q"].(string) {
+		switch req["q"].(string) {
 		case "find_node":
-			hg.HandleResFindNode(res, req.q)
+			hg.HandleResFindNode(res, req)
 		default:
 			panic("impossible")
 		}
@@ -387,7 +375,19 @@ func (hg *HashInfoGetter) HandleResFindNode(res map[string]interface{}, req map[
 			}
 			hg.uniqueNodePool[node.Id] = struct{}{}
 
+			// if finded node
+			if node.Id == req["a"].(map[string]interface{})["target"].(string) {
+				log.Info("finded: %v", helpful.GetHex(node.Id))
+				return
+			}
 
+			// if insert table err
+			// return
+
+
+			// find again req["a"].(map[string]interface{})["target"].(string)
+			// 先前查找的target
+			// 直到找到为止
 
 		}
 	}

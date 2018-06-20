@@ -6,6 +6,7 @@
 - [4. find_node](#4-find_node)
 - [5. 恶心的地方](#5-恶心的地方)
 - [6. 实现bencode解析](#6-实现bencode解析)
+- [7. kademlia](#7-kademlia)
 
 <!-- /TOC -->
 
@@ -48,6 +49,8 @@ rfc文档
 bt缓存站:
 * http://storetorrents.com/hash/
 
+kademlia:
+* http://www.ic.unicamp.br/~bit/ensino/mo809_1s13/papers/P2P/Kademlia-%20A%20Peer-to-Peer%20Information%20System%20Based%20on%20the%20XOR%20Metric%20.pdf
 
 
 <a id="markdown-2-我梳理的概要" name="2-我梳理的概要"></a>
@@ -142,3 +145,7 @@ object|{...}|{开头|map[string]interface{}| d开头e末尾 (d3:bar4:spam3:fooi4
 * 二进制与数据结构的转换    decode
 * 数据结构与二进制的转换    encode
 * 数据结构的json打印,可读性 Prettify
+
+<a id="markdown-7-kademlia" name="7-kademlia"></a>
+# 7. kademlia
+
