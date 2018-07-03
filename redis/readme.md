@@ -10,16 +10,14 @@
 # 1. 说明
 
 * https://github.com/go-redis/redis (连接的库)
-* https://github.com/gomodule/redigo (!)
+* https://github.com/gomodule/redigo (!用这个)
 * https://godoc.org/github.com/gomodule/redigo/redis#hdr-Executing_Commands (document)
 
 ```bash
 docker run --name redis1 \
     -p 6379:6379 \
     -d redis:4.0.10
-
 ```
-
 
 
 <a id="markdown-2-维度整理" name="2-维度整理"></a>
