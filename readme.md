@@ -79,6 +79,7 @@
 * [dht](dht)
 * [websocket](websocket)
 * [mariadb](mariadb)
+* [redis](redis)
 
 <a id="markdown-26-测试框架" name="26-测试框架"></a>
 ## 2.6. 测试框架
