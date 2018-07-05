@@ -8,7 +8,8 @@
     - [2.4. chat](#24-chat)
     - [2.5. 其他](#25-其他)
     - [2.6. 测试框架](#26-测试框架)
-    - [2.7. 特性](#27-特性)
+    - [2.7. 分布式系统](#27-分布式系统)
+    - [2.8. 特性](#28-特性)
 - [3. 底层部分](#3-底层部分)
 
 <!-- /TOC -->
@@ -88,8 +89,13 @@
 * [thrift_sudoku](thrift/sudoku)
 * [rabbitmq](rabbitmq)
 
-<a id="markdown-27-特性" name="27-特性"></a>
-## 2.7. 特性
+<a id="markdown-27-分布式系统" name="27-分布式系统"></a>
+## 2.7. 分布式系统
+
+* [recharge](recharge)
+
+<a id="markdown-28-特性" name="28-特性"></a>
+## 2.8. 特性
 
 * [SO_REUSEADDR/TIME_WAIT](so_reuseaddr)
 * [SO_REUSEPORT](so_reuseport)
