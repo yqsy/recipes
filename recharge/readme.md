@@ -26,8 +26,14 @@
 
 可见不管对内还是对外,都有重复入金的问题.原因是什么?`分布式系统的本身不可靠`,永远无法知道超时是对方没有收到,还是收到了
 
-做个小项目实践一下,提供接口:
+提供接口:
 
 * 注册 (邮箱/手机号 保证唯一性)
-* 入金 (rest/rpc/mq)  (都必须是调用方生成调用id)
+* 入金 (rest/rpc/mq)  (都必须是调用方生成调用流水)
 
+
+```
+protoc -I protocol/ protocol/recharge.proto --go_out=plugins=grpc:protocol
+
+
+```

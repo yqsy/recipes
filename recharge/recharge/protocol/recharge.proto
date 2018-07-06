@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package recharge;
+
+service User {
+    rpc Register (RegisterRequest) returns (RegisterReply) {}
+}
+
+message RegisterRequest {
+    string phone = 1;
+    string email = 2;
+    string invite_code = 3;
+    string passwd = 4;
+}
+
+message RegisterReply {
+    bool ok = 1;
+    string id = 2;
+    string msg = 3;
+}
+
