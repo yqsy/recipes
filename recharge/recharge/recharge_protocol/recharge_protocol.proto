@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package recharge;
+package recharge_protocol;
 
 service User {
     rpc Register (RegisterRequest) returns (RegisterReply) {}
@@ -19,3 +19,11 @@ message RegisterReply {
     string msg = 3;
 }
 
+
+service Recharge {
+    rpc Recharge (RechargeRequest) returns (RechargeReply) {}
+}
+
+message RechargeRequest {
+    string 
+}

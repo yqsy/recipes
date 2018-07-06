@@ -17,10 +17,9 @@ CREATE TABLE s_user (
 
 CREATE TABLE f_goldin_flow (
   id CHAR(60),
+  user_id CHAR(32),
   amount DECIMAL(18,2),
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  INDEX (user_id)
 );
 
-
-
-# INSERT s_user SET id = ?,phone = ?,email = ?, invite_code = ?, passwd = ? , balance = ?

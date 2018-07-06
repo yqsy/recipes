@@ -12,7 +12,9 @@
 
 ```bash
 # 生成
-protoc -I sudoku_protocol/ sudoku_protocol/sudoku_protocol.proto --go_out=plugins=grpc:sudoku_protocol
+protoc -I sudoku_protocol/  --go_out=plugins=grpc:sudoku_protocol  sudoku_protocol/sudoku_protocol.proto
+
+
 
 # -I 表示import的根目录
 # 参数1 表示元数据文件

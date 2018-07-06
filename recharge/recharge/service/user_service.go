@@ -2,7 +2,7 @@ package service
 
 import (
 	"golang.org/x/net/context"
-	pb "github.com/yqsy/recipes/recharge/recharge/protocol"
+	pb "github.com/yqsy/recipes/recharge/recharge/recharge_protocol"
 	"database/sql"
 	"github.com/satori/go.uuid"
 	"strings"

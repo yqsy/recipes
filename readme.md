@@ -88,6 +88,7 @@
 * [grpc_sudoku](grpc/sudoku)
 * [thrift_sudoku](thrift/sudoku)
 * [rabbitmq](rabbitmq)
+* [grpc_rest](grpc_rest)
 
 <a id="markdown-27-分布式系统" name="27-分布式系统"></a>
 ## 2.7. 分布式系统

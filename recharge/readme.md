@@ -33,7 +33,7 @@
 
 
 ```
-protoc -I protocol/ protocol/recharge.proto --go_out=plugins=grpc:protocol
+protoc -I recharge_protocol/ --go_out=plugins=grpc:recharge_protocol recharge_protocol/recharge_protocol.proto
 
 
 ```
