@@ -2,8 +2,15 @@ syntax = "proto3";
 
 package recharge_protocol;
 
+import "google/api/annotations.proto";
+
 service User {
-    rpc Register (RegisterRequest) returns (RegisterReply) {}
+    rpc Register (RegisterRequest) returns (RegisterReply) {
+        option (google.api.http) = {
+            post: "/register"
+            body: "*"
+        };
+    }
 }
 
 message RegisterRequest {
@@ -20,10 +27,10 @@ message RegisterReply {
 }
 
 
-service Recharge {
-    rpc Recharge (RechargeRequest) returns (RechargeReply) {}
-}
+//service Recharge {
+//    rpc Recharge (RechargeRequest) returns (RechargeReply) {}
+//}
 
-message RechargeRequest {
-    string 
-}
+//message RechargeRequest {
+//    string 
+//}

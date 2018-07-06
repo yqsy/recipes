@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 	"database/sql"
-	pb "github.com/yqsy/recipes/recharge/recharge/protocol"
+	pb "github.com/yqsy/recipes/recharge/recharge/recharge_protocol"
 	_ "github.com/go-sql-driver/mysql"
 	"google.golang.org/grpc"
 	"github.com/yqsy/recipes/recharge/recharge/service"
@@ -39,7 +39,7 @@ func main() {
 	}
 
 	s := grpc.NewServer()
-	pb.RegisterUserServer(s, &service.Handler{})
+	pb.RegisterUserServer(s, &service.Handler{DB: db})
 	reflection.Register(s)
 	if err := s.Serve(listener); err != nil {
 		panic(err)

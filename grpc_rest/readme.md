@@ -46,6 +46,11 @@ cd /home/yq/go/src/github.com/yqsy/recipes/grpc_rest/gw
 go run main.go -echo_endpoint :20001
 
 
-# swagger ? 好像超帅的
+# swagger ? 
+protoc -I /usr/local/include -I service_protocol \
+  -I $GOPATH/src \
+  -I $GOPATH/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis \
+  --swagger_out=logtostderr=true:service_protocol \
+  service_protocol/service_protocol.proto
 
 ```

@@ -32,8 +32,21 @@
 * 入金 (rest/rpc/mq)  (都必须是调用方生成调用流水)
 
 
-```
-protoc -I recharge_protocol/ --go_out=plugins=grpc:recharge_protocol recharge_protocol/recharge_protocol.proto
+```bash
+
+# 生成go代码
+protoc -I /usr/local/include -I recharge_protocol \
+    -I $GOPATH/src \
+    -I $GOPATH/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis \
+    --go_out=plugins=grpc:recharge_protocol \
+    recharge_protocol/recharge_protocol.proto
+
+# 生成reverse-proxy
+protoc -I /usr/local/include -I recharge_protocol \
+  -I $GOPATH/src \
+  -I $GOPATH/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis \
+  --grpc-gateway_out=logtostderr=true:recharge_protocol \
+   recharge_protocol/recharge_protocol.proto 
 
 
 ```
