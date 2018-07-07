@@ -21,16 +21,28 @@ message RegisterRequest {
 }
 
 message RegisterReply {
-    bool ok = 1;
-    string id = 2;
-    string msg = 3;
+    int32 status = 1;
+    string msg = 2;
+    string user_id = 3;
 }
 
 
-//service Recharge {
-//    rpc Recharge (RechargeRequest) returns (RechargeReply) {}
-//}
+service Recharge {
+   rpc Recharge (RechargeRequest) returns (RechargeReply) {
+       option (google.api.http) = {
+            post: "/recharge"
+            body: "*"
+       };
+   }
+}   
 
-//message RechargeRequest {
-//    string 
-//}
+message RechargeRequest {
+    string f_goldin_flow_id = 1;
+    string user_id = 2;
+    string amount = 3;
+}
+
+message RechargeReply {
+    int32 status = 1;
+    string msg = 2;
+}

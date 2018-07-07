@@ -16,7 +16,7 @@ type Handler struct {
 func (s *Handler) IsUserExist(tx *sql.Tx, in *pb.RegisterRequest) bool {
 	var count uint
 	if err := tx.QueryRow(
-		"SELECT count(*) FROM s_user WHERE phone = ? OR email = ?",
+		"SELECT COUNT(*) FROM s_user WHERE phone = ? OR email = ?",
 		in.Phone, in.Email).Scan(&count); err != nil {
 		panic(err)
 	} else {
@@ -38,16 +38,15 @@ func (s *Handler) GetUUID() string {
 
 func (s *Handler) InsertUser(tx *sql.Tx, in *pb.RegisterRequest, ud string) error {
 	if stmt, err := tx.Prepare("INSERT s_user SET " +
-		"id = ?, phone = ?,email = ?, invite_code = ?, passwd = ? "); err != nil {
+		"id = ?, phone = ?,email = ?, invite_code = ?, passwd = ?, balance=0.0"); err != nil {
 		panic(err)
 	} else {
 		defer stmt.Close()
 
 		passwd, err := bcrypt.GenerateFromPassword([]byte(in.Passwd), bcrypt.DefaultCost)
-		if err != nil {
+		if err != nil || len(passwd) != 60 {
 			panic("bcrypt get passwd err")
 		}
-
 		_, err = stmt.Exec(ud, in.Phone, in.Email, in.InviteCode, passwd)
 		return err
 	}
@@ -56,7 +55,7 @@ func (s *Handler) InsertUser(tx *sql.Tx, in *pb.RegisterRequest, ud string) erro
 func (s *Handler) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.RegisterReply, error) {
 	// 手机/邮箱/同时注册
 	if (in.Email == "" && in.Phone == "") || in.Passwd == "" {
-		return &pb.RegisterReply{Ok: false, Msg: "格式不正确"}, nil
+		return &pb.RegisterReply{Status: "ok", Msg: "格式不正确"}, nil
 	}
 
 	if tx, err := s.DB.Begin(); err != nil {
@@ -76,6 +75,6 @@ func (s *Handler) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.Reg
 		if err := tx.Commit(); err != nil {
 			panic(err)
 		}
-		return &pb.RegisterReply{Ok: true, Id: ud, Msg: "注册成功"}, nil
+		return &pb.RegisterReply{Ok: true, UserId: ud, Msg: "注册成功"}, nil
 	}
 }

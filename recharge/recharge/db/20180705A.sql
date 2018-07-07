@@ -16,10 +16,11 @@ CREATE TABLE s_user (
 
 
 CREATE TABLE f_goldin_flow (
-  id CHAR(60),
+  id CHAR(64),
   user_id CHAR(32),
   amount DECIMAL(18,2),
   PRIMARY KEY (id),
   INDEX (user_id)
 );
+
 

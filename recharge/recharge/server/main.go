@@ -39,7 +39,9 @@ func main() {
 	}
 
 	s := grpc.NewServer()
-	pb.RegisterUserServer(s, &service.Handler{DB: db})
+	handler := &service.Handler{DB: db}
+	pb.RegisterUserServer(s, handler)
+	pb.RegisterRechargeServer(s, handler)
 	reflection.Register(s)
 	if err := s.Serve(listener); err != nil {
 		panic(err)
