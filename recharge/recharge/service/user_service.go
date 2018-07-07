@@ -55,7 +55,7 @@ func (s *Handler) InsertUser(tx *sql.Tx, in *pb.RegisterRequest, ud string) erro
 func (s *Handler) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.RegisterReply, error) {
 	// 手机/邮箱/同时注册
 	if (in.Email == "" && in.Phone == "") || in.Passwd == "" {
-		return &pb.RegisterReply{Status: "ok", Msg: "格式不正确"}, nil
+		return &pb.RegisterReply{Status: Error, Msg: "格式不正确"}, nil
 	}
 
 	if tx, err := s.DB.Begin(); err != nil {
@@ -64,17 +64,17 @@ func (s *Handler) Register(ctx context.Context, in *pb.RegisterRequest) (*pb.Reg
 		defer tx.Rollback()
 
 		if s.IsUserExist(tx, in) {
-			return &pb.RegisterReply{Ok: false, Msg: "账号已存在"}, nil
+			return &pb.RegisterReply{Status: Error, Msg: "账号已存在"}, nil
 		}
 
 		ud := s.GetUUID()
 		if s.InsertUser(tx, in, ud) != nil {
-			return &pb.RegisterReply{Ok: false, Msg: "注册失败"}, nil
+			return &pb.RegisterReply{Status: Error, Msg: "注册失败"}, nil
 		}
 
 		if err := tx.Commit(); err != nil {
 			panic(err)
 		}
-		return &pb.RegisterReply{Ok: true, UserId: ud, Msg: "注册成功"}, nil
+		return &pb.RegisterReply{Status: Ok, UserId: ud, Msg: "注册成功"}, nil
 	}
 }

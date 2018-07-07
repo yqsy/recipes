@@ -53,12 +53,12 @@ func (s *Handler) AppendUserAmount(tx *sql.Tx, in *pb.RechargeRequest) error {
 
 func (s *Handler) Recharge(ctx context.Context, in *pb.RechargeRequest) (*pb.RechargeReply, error) {
 	if len(in.FGoldinFlowId) != 64 || len(in.UserId) != 32 {
-		return &pb.RechargeReply{Ok: false, Msg: "Id错误"}, nil
+		return &pb.RechargeReply{Status: Error, Msg: "Id错误"}, nil
 	}
 
 	price, err := decimal.NewFromString(in.Amount)
 	if err != nil || price.Cmp(s.ZeroDecimal()) < 0 {
-		return &pb.RechargeReply{Ok: false, Msg: "数量错误"}, nil
+		return &pb.RechargeReply{Status: Error, Msg: "数量错误"}, nil
 	}
 
 	if tx, err := s.DB.Begin(); err != nil {
@@ -67,21 +67,21 @@ func (s *Handler) Recharge(ctx context.Context, in *pb.RechargeRequest) (*pb.Rec
 		defer tx.Rollback()
 
 		if !s.IsUserIdExist(tx, in) {
-			return &pb.RechargeReply{Ok: false, Msg: "账号不存在"}, nil
+			return &pb.RechargeReply{Status: Error, Msg: "账号不存在"}, nil
 		}
 
 		if s.InsertGoldInFlow(tx, in) != nil {
-			return &pb.RechargeReply{Ok: false, Msg: "产生流水失败"}, nil
+			return &pb.RechargeReply{Status: Error, Msg: "产生流水失败"}, nil
 		}
 
 		if s.AppendUserAmount(tx, in) != nil {
-			return &pb.RechargeReply{Ok: false, Msg: "入金失败"}, nil
+			return &pb.RechargeReply{Status: Error, Msg: "入金失败"}, nil
 		}
 
 		if err := tx.Commit(); err != nil {
 			panic(err)
 		}
 
-		return &pb.RechargeReply{Ok: true, Msg: "入金成功"}, nil
+		return &pb.RechargeReply{Status: Ok, Msg: "入金成功"}, nil
 	}
 }
