@@ -94,6 +94,7 @@
 ## 2.7. 分布式系统
 
 * [recharge](recharge)
+* [mimeralpool](mineralpool)
 
 <a id="markdown-28-特性" name="28-特性"></a>
 ## 2.8. 特性

@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package mimeralpool_protocol;
+
+import "google/api/annotations.proto";
+
+service Mimeralpool {
+
+
+}
+
+
