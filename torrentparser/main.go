@@ -9,6 +9,8 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"encoding/hex"
+	"crypto/md5"
 )
 
 var usage = `Usage:
@@ -75,7 +77,21 @@ func main() {
 		if err := json.Indent(&prettyJSON, jsonRaw, "", "    "); err != nil {
 			panic(err)
 		} else {
-			fmt.Printf("%s\n", string(prettyJSON.Bytes()))
+			fmt.Printf("%v\n", string(prettyJSON.Bytes()))
+
+			pieceLen := len(torrentMeta.Pieces)
+			if pieceLen%20 != 0 {
+				panic("invalid pieceLen")
+			}
+
+			fmt.Printf("piecesLen: %v\n", len(torrentMeta.Pieces))
+			md5Hash := md5.Sum([]byte(torrentMeta.Pieces))
+			fmt.Printf("hash: %v\n", hex.EncodeToString(md5Hash[:]))
+			for i := 0; i < pieceLen/20; i += 20 {
+				curPiece := torrentMeta.Pieces[i : i+20]
+				pieceHex := hex.EncodeToString([]byte(curPiece))
+				fmt.Printf("%v %v\n", i/20, pieceHex)
+			}
 		}
 	}
 }
