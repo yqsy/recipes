@@ -81,6 +81,7 @@
 * [websocket](websocket)
 * [mariadb](mariadb)
 * [redis](redis)
+* [torrentparse(种子文件解析器)](torrentparse)
 
 <a id="markdown-26-测试框架" name="26-测试框架"></a>
 ## 2.6. 测试框架
