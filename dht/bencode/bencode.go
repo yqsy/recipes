@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sort"
 )
 
 func isDigit(c byte) bool {
@@ -63,9 +64,18 @@ func Encode(v interface{}) string {
 		return prettify + "e"
 	case map[string]interface{}:
 		o := v.(map[string]interface{})
+
+		// https://en.wikipedia.org/wiki/Bencode
+		// All keys must be byte strings and must appear in lexicographical order.
+		var sortedKeys []string
+		for k := range o {
+			sortedKeys = append(sortedKeys, k)
+		}
+		sort.Strings(sortedKeys)
+
 		prettify := "d"
-		for k, v := range o {
-			prettify += fmt.Sprintf("%v%v", toBencodeString(k), Encode(v))
+		for _, k := range sortedKeys {
+			prettify += fmt.Sprintf("%v%v", toBencodeString(k), Encode(o[k]))
 		}
 		return prettify + "e"
 
