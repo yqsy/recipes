@@ -88,10 +88,40 @@ func deepPrint(torrentByte []byte) {
 	infoEncoded := []byte(bencode.Encode(info))
 	sha1Sum := sha1.Sum(infoEncoded)
 	info["sha1_hash"] = hex.EncodeToString(sha1Sum[:])
-	//fmt.Printf("hash: %v\n", hex.EncodeToString(sha1Sum[:]))
 
-	// 清空
-	info["pieces"] = ""
+	// 对files做补充说明
+	ChangeFilesNode(info)
+
+	// 重写文件的pieceshash
+	CalcPieces(info)
+
+	jsonRaw := []byte(bencode.Prettify(objInterface))
+
+	var prettyJSON bytes.Buffer
+	if err := json.Indent(&prettyJSON, jsonRaw, "", "    "); err != nil {
+		panic(err)
+	}
+	fmt.Printf("%v\n", string(prettyJSON.Bytes()))
+}
+
+func CalcPieces(info map[string]interface{}) {
+	piecesStorage := info["pieces"].(string)
+	// 把pieces从bits转换成hex
+	pieceLen := len(piecesStorage)
+	if pieceLen%20 != 0 {
+		panic("invalid pieceLen")
+	}
+	pieces := make([]interface{}, 0)
+	for i := 0; i < pieceLen/20; i += 1 {
+		curPiece := piecesStorage[i*20 : i*20+20]
+		pieceHex := hex.EncodeToString([]byte(curPiece))
+		pieces = append(pieces, pieceHex)
+	}
+	info["pieces"] = pieces
+	info["pieces_num"] = pieceLen / 20
+}
+
+func ChangeFilesNode(info map[string]interface{}) {
 
 	// 计算文件
 	if err := typechekcer.CheckMapValue(info, "files", reflect.Slice, reflect.Map); err != nil {
@@ -102,10 +132,8 @@ func deepPrint(torrentByte []byte) {
 	if err := typechekcer.CheckMapValue(info, "name", reflect.String, reflect.Invalid); err != nil {
 		panic(err)
 	}
-
 	// 偏移
 	var offset int
-
 	files := info["files"].([]interface{})
 	for i := 0; i < len(files); i++ {
 		err := typechekcer.CheckMapValue(files[i], "length", reflect.Int, reflect.Invalid)
@@ -144,13 +172,8 @@ func deepPrint(torrentByte []byte) {
 		offset = offset + length
 	}
 
-	jsonRaw := []byte(bencode.Prettify(objInterface))
-
-	var prettyJSON bytes.Buffer
-	if err := json.Indent(&prettyJSON, jsonRaw, "", "    "); err != nil {
-		panic(err)
-	}
-	fmt.Printf("%v\n", string(prettyJSON.Bytes()))
+	// 设置文件的大小
+	info["file_size"] = offset
 }
 
 func rawPrint(torrentByte []byte) {
