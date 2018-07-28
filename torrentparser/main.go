@@ -145,6 +145,7 @@ func deepPrint(torrentByte []byte) {
 	}
 
 	jsonRaw := []byte(bencode.Prettify(objInterface))
+
 	var prettyJSON bytes.Buffer
 	if err := json.Indent(&prettyJSON, jsonRaw, "", "    "); err != nil {
 		panic(err)

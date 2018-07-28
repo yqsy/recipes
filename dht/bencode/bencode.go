@@ -36,9 +36,16 @@ func Prettify(v interface{}) string {
 
 	case map[string]interface{}:
 		o := v.(map[string]interface{})
+
+		var sortedKeys []string
+		for k := range o {
+			sortedKeys = append(sortedKeys, k)
+		}
+		sort.Strings(sortedKeys)
+
 		prettify := "{"
-		for k, v := range o {
-			prettify += fmt.Sprintf(`"%v": %v,`, k, Prettify(v))
+		for _, k := range sortedKeys {
+			prettify += fmt.Sprintf(`"%v": %v,`, k, Prettify(o[k]))
 		}
 		if len(prettify) > 0 && prettify[len(prettify)-1] == ',' {
 			prettify = prettify[:len(prettify)-1]
