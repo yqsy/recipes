@@ -7,6 +7,7 @@
     - [2.3. benchmark](#23-benchmark)
     - [2.4. chat](#24-chat)
     - [2.5. 其他](#25-其他)
+    - [p2p](#p2p)
     - [2.6. 测试框架](#26-测试框架)
     - [2.7. 分布式系统](#27-分布式系统)
     - [2.8. 特性](#28-特性)
@@ -77,11 +78,17 @@
 * [procmon(简易监控)](procmon)
 * [cgi留言板](cgi)
 * [fastcgi](fastcgi)
-* [dht](dht)
 * [websocket](websocket)
 * [mariadb](mariadb)
 * [redis](redis)
+
+
+<a id="markdown-p2p" name="p2p"></a>
+## p2p
+
 * [torrentparse(种子文件解析器)](torrentparse)
+* [dht(嗅探)](dht)
+* p2pdownload(p2p下载器)(p2pdownload)
 
 <a id="markdown-26-测试框架" name="26-测试框架"></a>
 ## 2.6. 测试框架

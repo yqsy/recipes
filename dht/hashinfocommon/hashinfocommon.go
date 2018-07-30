@@ -129,6 +129,7 @@ func CheckReqAnnouncePeerValid(req map[string]interface{}) error {
 	return nil
 }
 
+// 20 字节hash,4字节len,2字节port
 func GetNodes(str string) []Node {
 	var nodes []Node
 
