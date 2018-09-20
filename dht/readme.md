@@ -102,8 +102,6 @@ go|id:自身 target:自身|id:衍生地址+自身混合 target:衍生地址|全�
 python|id:自身 target:随机|id:衍生地址+自身混合 target:随机|随机2字节
 
 
-
-
 <a id="markdown-5-恶心的地方" name="5-恶心的地方"></a>
 # 5. 恶心的地方
 
@@ -149,3 +147,6 @@ object|{...}|{开头|map[string]interface{}| d开头e末尾 (d3:bar4:spam3:fooi4
 <a id="markdown-7-kademlia" name="7-kademlia"></a>
 # 7. kademlia
 
+关键的实现:
+
+* https://github.com/anacrolix/dht/blob/master/table.go
