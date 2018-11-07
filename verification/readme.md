@@ -25,9 +25,6 @@
 Authorization: Basic YWRtaW46MTIzNDU2
 ```
 
-![](http://ouxarji35.bkt.clouddn.com/basic.png)
-
-
 命令
 ```
 # 生成私钥
