@@ -69,11 +69,11 @@
 * [identity_verification(通道身份验证)](verification)
 * [maxconnection(最大连接数)](maxconnection)
 * [codec(编解码器)](codec)
-* heart_beat(心跳包)
-* connection_pool(连接池)
+* ~~heart_beat(心跳包)~~
+* ~~connection_pool(连接池)~~
 * [idleconnection(空闲连接时间轮/堆/升序链表/多线程做法)](idleconnection)
 * [roundtrip(测时间差)](roundtrip)
-* simple_rpc
+* ~~simple_rpc~~
 * [sudoku负载均衡](sudoku)
 * [procmon(简易监控)](procmon)
 * [cgi留言板](cgi)
@@ -88,7 +88,7 @@
 
 * [torrentparse(种子文件解析器)](torrentparse)
 * [dht(嗅探)](dht)
-* p2pdownload(p2p下载器)(p2pdownload)
+* ~~p2pdownload(p2p下载器)(p2pdownload)~~
 
 <a id="markdown-26-测试框架" name="26-测试框架"></a>
 ## 2.6. 测试框架
@@ -116,5 +116,5 @@
 * [自旋锁/互斥量/条件变量](sync)
 * [lock_free/wait_free](sync)
 * [blockqueue](blockqueue)
-* mcoroutine(协程实现)
-* mtcp(可靠传输协议实现)
+* ~~mcoroutine(协程实现)~~
+* ~~mtcp(可靠传输协议实现)~~
