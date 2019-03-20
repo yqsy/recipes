@@ -1,9 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"os"
-	"fmt"
 	"sync/atomic"
 	"time"
 )
@@ -12,7 +12,6 @@ var (
 	receivedBytes int64
 	receivedMsgs  int64
 )
-
 
 func serve(conn net.Conn) {
 	defer conn.Close()
